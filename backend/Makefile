@@ -1,9 +1,11 @@
 GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := $(CURDIR)/bin/golangci-lint
+MOCKERY_VERSION := v3.8.1
+MOCKERY := $(CURDIR)/bin/mockery
 
 COMPOSE := docker compose -f ../docker-compose.yml
 
-.PHONY: run build test test-integration lint lint-fix tools infra-up infra-down migrate-up
+.PHONY: run build test test-integration lint lint-fix mocks tools infra-up infra-down migrate-up
 
 infra-up:
 	$(COMPOSE) up -d --wait postgres redis
@@ -33,7 +35,13 @@ lint: $(GOLANGCI_LINT)
 lint-fix: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) run --fix ./...
 
-tools: $(GOLANGCI_LINT)
+mocks: $(MOCKERY)
+	$(MOCKERY)
+
+tools: $(GOLANGCI_LINT) $(MOCKERY)
+
+$(MOCKERY):
+	GOBIN=$(CURDIR)/bin go install github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 
 $(GOLANGCI_LINT):
 	GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)

@@ -167,3 +167,9 @@ func validateDecimal(verr *ValidationError, field string, v decimal.Decimal, pla
 		verr.Add(field, CodeTooManyDecimals, field+" must have at most "+decimal.NewFromInt32(places).String()+" decimal places")
 	}
 }
+
+type ProductFilter struct {
+	CategoryID *uuid.UUID
+	Limit      int
+	Offset     int
+}

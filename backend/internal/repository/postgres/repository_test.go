@@ -199,13 +199,13 @@ func TestProductRepository(t *testing.T) {
 		}
 		mustProduct(t, products, "B-1", books.ID)
 
-		page, total, err := products.List(ctx, ProductFilter{Limit: 2})
+		page, total, err := products.List(ctx, domain.ProductFilter{Limit: 2})
 		require.NoError(t, err)
 		assert.EqualValues(t, 4, total)
 		require.Len(t, page, 2)
 		assert.Equal(t, "B-1", page[0].SKU, "newest first")
 
-		page, total, err = products.List(ctx, ProductFilter{CategoryID: &sports.ID, Limit: 10, Offset: 1})
+		page, total, err = products.List(ctx, domain.ProductFilter{CategoryID: &sports.ID, Limit: 10, Offset: 1})
 		require.NoError(t, err)
 		assert.EqualValues(t, 3, total)
 		assert.Len(t, page, 2)

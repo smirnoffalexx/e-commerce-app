@@ -10,13 +10,8 @@ import (
 	"gorm.io/gorm/clause"
 
 	"e-commerce-backend/internal/domain"
+	"e-commerce-backend/internal/usecase"
 )
-
-type ProductFilter struct {
-	CategoryID *uuid.UUID
-	Limit      int
-	Offset     int
-}
 
 type ProductRepository struct {
 	db *gorm.DB
@@ -59,7 +54,7 @@ func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.P
 	return productToDomain(&m), nil
 }
 
-func (r *ProductRepository) List(ctx context.Context, f ProductFilter) ([]domain.Product, int64, error) {
+func (r *ProductRepository) List(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int64, error) {
 	q := r.db.WithContext(ctx).Model(&productModel{})
 	if f.CategoryID != nil {
 		q = q.Where("category_id = ?", *f.CategoryID)
@@ -168,3 +163,5 @@ func lockActiveCategory(tx *gorm.DB, id uuid.UUID) (categoryModel, error) {
 	}
 	return m, nil
 }
+
+var _ usecase.ProductRepository = (*ProductRepository)(nil)

@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"e-commerce-backend/internal/domain"
+	"e-commerce-backend/internal/usecase"
 )
 
 type CategoryRepository struct {
@@ -115,3 +116,5 @@ func (r *CategoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return nil
 	})
 }
+
+var _ usecase.CategoryRepository = (*CategoryRepository)(nil)
