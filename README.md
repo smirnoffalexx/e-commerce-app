@@ -4,7 +4,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 
 | Part | Stack | Status |
 |---|---|---|
-| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile and compose service are done; CI is next, tracing is planned. |
+| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
 | Frontend | React, Next.js | Not started yet |
 
 The rest of this document describes the backend. Frontend sections will be added when it is built.
@@ -376,17 +376,21 @@ The focus is business rules and the unusual cases, not line coverage:
 - **Checkout**: cart limits, duplicates and card rules; price and stock conflicts stop before any payment; every payment outcome (approved, declined, insufficient funds, timeout, provider error) and stock release on failure; payment survives a disconnected client; idempotent replay, reused key, request in progress, Redis outage falling back to the unique index; customers never see other customers' orders.
 - **Integration** (real PostgreSQL 18): repositories, soft delete and SKU reuse, database constraints, 10 concurrent updates with the same version, 30 races between category delete and product create, search ranking, typos, operators and pagination stability; checkout end to end with the fake provider, and **20 buyers racing for the last item: exactly one order is paid, stock ends at 0**.
 
+## CI
+
+GitHub Actions, `.github/workflows/backend.yml`. Runs on pushes to `master` and on pull requests that touch `backend/`, `docker-compose.yml`, `example_data.csv` or the workflow itself; parallel runs of the same pull request are cancelled. Three jobs run one after another (`needs`), so a lint or build error stops the pipeline before the slower tests:
+
+| Job | Steps |
+|---|---|
+| **build** | `make swagger`, `make lint` (linter errors are printed in the job log), `go build` |
+| **Unit tests** | `make swagger`, `make test` (race detector) |
+| **Integration tests** | `make swagger`, `make test-integration` (PostgreSQL 18 in testcontainers, Docker is available on the runner) |
+
+CI uses the same `make` targets as a developer, so tool versions (golangci-lint, mockery, swag) are pinned in one place, the Makefile; the installed tools are cached by its hash. Go comes from `go.mod` and `GOTOOLCHAIN=local` forbids silently downloading another version. The workflow has read-only permissions and pushes no images; publishing to a registry is a next step together with deployment.
+
 ## Known limitations and next steps
 
-- GitHub Actions CI (in progress).
-- **OpenTelemetry tracing** (planned, not implemented):
-  - `internal/telemetry` with the OTel SDK, OTLP exporter and W3C `traceparent` propagation, so traces continue through the Next.js BFF. Configured only with the standard `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_TRACES_SAMPLER` (`parentbased_traceidratio` in production); with no endpoint a no-op provider is used, so tests and local runs pay nothing. The provider is flushed on graceful shutdown.
-  - Automatic spans: Gin (span named by route template such as `GET /api/v1/orders/:id`, not the raw path; health and swagger routes skipped; error status only for 5xx), GORM (parameterized SQL only, never values), go-redis (rate limit, refresh tokens, checkout lock).
-  - Manual spans where automatic ones explain nothing: checkout as `reserve` → `payment.charge` → `finalize` with order id, amount, line count, outcome, failure code and replay flag (never card data); search stage (full-text or trigram fallback) and hit count; CSV import mode, dry run and row counts.
-  - `trace_id` / `span_id` added to access and error logs by a slog handler wrapper, so a `request_id` from a problem response leads to the log line and from there to the trace.
-  - Jaeger all-in-one behind `docker compose --profile tracing`, UI on port 16686.
-  - Tests with an in-memory span recorder: checkout span tree and attributes, no card data in spans, route-template span names, 4xx not marked as errors.
-  - Later: RED metrics for HTTP, checkout duration and payment outcome counters (OTel metrics or Prometheus).
+- OpenTelemetry tracing: spans for HTTP, SQL, Redis and checkout steps (reserve, payment, finalize), `trace_id` in logs, Jaeger behind `docker compose --profile tracing`.
 - A crash between reservation and payment leaves a `PENDING` order holding stock. A background job should expire old `PENDING` orders (there is a partial index for it) after checking the provider with the order id. With a real provider a timeout is ambiguous (the charge may have gone through), so the order would stay `PENDING` until reconciliation instead of failing immediately; the fake provider guarantees that a timeout charged nothing.
 - One currency; no taxes, discounts or shipping in the total.
 - Cart lives in the browser (`localStorage`); prices and stock are re-checked at checkout. If carts must follow the user across devices, move them to the database.
