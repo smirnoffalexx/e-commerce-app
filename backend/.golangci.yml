@@ -50,6 +50,7 @@ linters:
         linters:
           - gosec
           - unparam
+          - contextcheck
 
 formatters:
   enable:

@@ -3,7 +3,7 @@ GOLANGCI_LINT := $(CURDIR)/bin/golangci-lint
 
 COMPOSE := docker compose -f ../docker-compose.yml
 
-.PHONY: run build test lint lint-fix tools infra-up infra-down migrate-up
+.PHONY: run build test test-integration lint lint-fix tools infra-up infra-down migrate-up
 
 infra-up:
 	$(COMPOSE) up -d --wait postgres redis
@@ -23,6 +23,9 @@ build:
 
 test:
 	go test -race -count=1 ./...
+
+test-integration:
+	go test -race -count=1 -tags integration ./...
 
 lint: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) run ./...
