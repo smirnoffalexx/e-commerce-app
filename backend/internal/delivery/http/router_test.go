@@ -34,19 +34,39 @@ type testAPI struct {
 	router     *gin.Engine
 	products   *mocks.ProductService
 	categories *mocks.CategoryService
+	auth       *mocks.AuthService
+}
+
+type stubTokens struct{}
+
+func (stubTokens) Parse(token string) (domain.Principal, error) {
+	principals := map[string]domain.Principal{
+		"admin":      {UserID: uuid.MustParse("0192f6b8-0000-7000-8000-000000000001"), Role: domain.RoleAdmin},
+		"superadmin": {UserID: uuid.MustParse("0192f6b8-0000-7000-8000-000000000002"), Role: domain.RoleSuperAdmin},
+		"user":       {UserID: uuid.MustParse("0192f6b8-0000-7000-8000-000000000003"), Role: domain.RoleUser},
+		"temp-admin": {UserID: uuid.MustParse("0192f6b8-0000-7000-8000-000000000004"), Role: domain.RoleAdmin, MustChangePassword: true},
+	}
+	p, ok := principals[token]
+	if !ok {
+		return domain.Principal{}, domain.ErrInvalidToken
+	}
+	return p, nil
 }
 
 func newTestAPI(t *testing.T) *testAPI {
 	t.Helper()
 	products := mocks.NewProductService(t)
 	categories := mocks.NewCategoryService(t)
+	authSvc := mocks.NewAuthService(t)
 	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     slog.New(slog.DiscardHandler),
 		Health:     handler.NewHealthHandler(time.Second),
 		Products:   handler.NewProductHandler(products),
 		Categories: handler.NewCategoryHandler(categories),
+		Auth:       handler.NewAuthHandler(authSvc),
+		Tokens:     stubTokens{},
 	})
-	return &testAPI{router: router, products: products, categories: categories}
+	return &testAPI{router: router, products: products, categories: categories, auth: authSvc}
 }
 
 func (a *testAPI) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {
@@ -54,7 +74,12 @@ func (a *testAPI) do(method, path, body string, headers ...string) *httptest.Res
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set("Authorization", "Bearer admin")
 	for i := 0; i+1 < len(headers); i += 2 {
+		if headers[i+1] == "" {
+			req.Header.Del(headers[i])
+			continue
+		}
 		req.Header.Set(headers[i], headers[i+1])
 	}
 	w := httptest.NewRecorder()
@@ -295,4 +320,77 @@ func TestRouterFallbacks(t *testing.T) {
 		assert.Equal(t, "internal_error", decodeProblem(t, w).Code)
 		assert.NotContains(t, w.Body.String(), "boom")
 	})
+}
+
+func TestWriteEndpoints_RequireAdmin(t *testing.T) {
+	id := uuid.NewString()
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/products"},
+		{http.MethodPut, "/api/v1/products/" + id},
+		{http.MethodDelete, "/api/v1/products/" + id},
+		{http.MethodPost, "/api/v1/categories"},
+		{http.MethodPut, "/api/v1/categories/" + id},
+		{http.MethodDelete, "/api/v1/categories/" + id},
+	}
+	cases := []struct {
+		name       string
+		auth       string
+		wantStatus int
+		wantCode   string
+	}{
+		{"no token", "", http.StatusUnauthorized, "missing_token"},
+		{"malformed header", "Token admin", http.StatusUnauthorized, "missing_token"},
+		{"invalid token", "Bearer forged", http.StatusUnauthorized, "invalid_token"},
+		{"customer", "Bearer user", http.StatusForbidden, "insufficient_permissions"},
+		{"admin with temporary password", "Bearer temp-admin", http.StatusForbidden, "password_change_required"},
+	}
+
+	for _, w := range writes {
+		for _, tc := range cases {
+			t.Run(w.method+" "+w.path+" "+tc.name, func(t *testing.T) {
+				api := newTestAPI(t)
+
+				resp := api.do(w.method, w.path, `{}`, "Authorization", tc.auth)
+
+				require.Equal(t, tc.wantStatus, resp.Code, resp.Body.String())
+				assert.Equal(t, tc.wantCode, decodeProblem(t, resp).Code)
+			})
+		}
+	}
+}
+
+func TestReadEndpoints_ArePublic(t *testing.T) {
+	api := newTestAPI(t)
+	api.categories.EXPECT().List(mock.Anything).Return([]domain.Category{}, nil)
+
+	w := api.do(http.MethodGet, "/api/v1/categories", "", "Authorization", "")
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestSuperAdminCanWriteProducts(t *testing.T) {
+	api := newTestAPI(t)
+	id := uuid.Must(uuid.NewV7())
+	api.products.EXPECT().Delete(mock.Anything, id).Return(nil)
+
+	w := api.do(http.MethodDelete, "/api/v1/products/"+id.String(), "", "Authorization", "Bearer superadmin")
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestTemporaryPasswordAllowsOnlyAccountEndpoints(t *testing.T) {
+	api := newTestAPI(t)
+	tempID := uuid.MustParse("0192f6b8-0000-7000-8000-000000000004")
+	api.auth.EXPECT().Me(mock.Anything, tempID).Return(domain.User{ID: tempID, Role: domain.RoleAdmin, MustChangePassword: true}, nil)
+
+	w := api.do(http.MethodGet, "/api/v1/auth/me", "", "Authorization", "Bearer temp-admin")
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"must_change_password":true`)
+}
+
+func TestLogin_InvalidCredentialsIs401(t *testing.T) {
+	api := newTestAPI(t)
+	api.auth.EXPECT().Login(mock.Anything, "jane@example.com", "wrong-password").Return(usecase.Session{}, domain.ErrInvalidCredentials)
+
+	w := api.do(http.MethodPost, "/api/v1/auth/login", `{"email":"jane@example.com","password":"wrong-password"}`, "Authorization", "")
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, "invalid_credentials", decodeProblem(t, w).Code)
 }

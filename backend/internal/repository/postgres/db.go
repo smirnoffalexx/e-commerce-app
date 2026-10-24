@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -22,12 +23,12 @@ func NewDB(ctx context.Context, dsn string, log *slog.Logger) (*gorm.DB, error) 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		TranslateError: true,
 		NowFunc:        func() time.Time { return time.Now().UTC() },
-		Logger: logger.NewSlogLogger(log, logger.Config{
+		Logger: expectedErrorsFilter{logger.NewSlogLogger(log, logger.Config{
 			SlowThreshold:             slowQuery,
 			LogLevel:                  logger.Warn,
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      true,
-		}),
+		})},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
@@ -73,4 +74,19 @@ func (h *HealthChecker) Check(ctx context.Context) error {
 		return err
 	}
 	return sqlDB.PingContext(ctx)
+}
+
+type expectedErrorsFilter struct {
+	logger.Interface
+}
+
+func (f expectedErrorsFilter) LogMode(level logger.LogLevel) logger.Interface {
+	return expectedErrorsFilter{f.Interface.LogMode(level)}
+}
+
+func (f expectedErrorsFilter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if errors.Is(err, gorm.ErrDuplicatedKey) || errors.Is(err, gorm.ErrForeignKeyViolated) {
+		err = nil
+	}
+	f.Interface.Trace(ctx, begin, fc, err)
 }

@@ -17,13 +17,14 @@ func NewCategoryHandler(categories CategoryService) *CategoryHandler {
 	return &CategoryHandler{categories: categories}
 }
 
-func (h *CategoryHandler) Register(r gin.IRouter) {
+func (h *CategoryHandler) Register(r gin.IRouter, write ...gin.HandlerFunc) {
 	g := r.Group("/categories")
 	g.GET("", h.List)
-	g.POST("", h.Create)
 	g.GET("/:id", h.Get)
-	g.PUT("/:id", h.Rename)
-	g.DELETE("/:id", h.Delete)
+	w := g.Group("", write...)
+	w.POST("", h.Create)
+	w.PUT("/:id", h.Rename)
+	w.DELETE("/:id", h.Delete)
 }
 
 // List godoc
@@ -83,6 +84,9 @@ func (h *CategoryHandler) Get(c *gin.Context) {
 //	@Failure		415		{object}	response.Problem	"Content-Type is not application/json"
 //	@Failure		422		{object}	response.Problem	"Validation failed"
 //	@Failure		500		{object}	response.Problem
+//	@Security		BearerAuth
+//	@Failure		401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure		403	{object}	response.Problem	"Insufficient permissions"
 //	@Router			/api/v1/categories [post]
 func (h *CategoryHandler) Create(c *gin.Context) {
 	var req dto.CategoryRequest
@@ -114,6 +118,9 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 //	@Failure	415		{object}	response.Problem	"Content-Type is not application/json"
 //	@Failure	422		{object}	response.Problem	"Validation failed"
 //	@Failure	500		{object}	response.Problem
+//	@Security	BearerAuth
+//	@Failure	401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure	403	{object}	response.Problem	"Insufficient permissions"
 //	@Router		/api/v1/categories/{id} [put]
 func (h *CategoryHandler) Rename(c *gin.Context) {
 	id, err := response.PathUUID(c, "id")
@@ -145,6 +152,9 @@ func (h *CategoryHandler) Rename(c *gin.Context) {
 //	@Failure		404	{object}	response.Problem	"Category not found"
 //	@Failure		409	{object}	response.Problem	"Category has products"
 //	@Failure		500	{object}	response.Problem
+//	@Security		BearerAuth
+//	@Failure		401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure		403	{object}	response.Problem	"Insufficient permissions"
 //	@Router			/api/v1/categories/{id} [delete]
 func (h *CategoryHandler) Delete(c *gin.Context) {
 	id, err := response.PathUUID(c, "id")

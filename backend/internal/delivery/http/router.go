@@ -9,9 +9,11 @@ import (
 	ginswagger "github.com/swaggo/gin-swagger"
 
 	_ "e-commerce-backend/docs"
+	"e-commerce-backend/internal/delivery/http/auth"
 	"e-commerce-backend/internal/delivery/http/handler"
 	"e-commerce-backend/internal/delivery/http/middleware"
 	"e-commerce-backend/internal/delivery/http/response"
+	"e-commerce-backend/internal/domain"
 )
 
 type RouterDeps struct {
@@ -20,13 +22,20 @@ type RouterDeps struct {
 	Health     *handler.HealthHandler
 	Products   *handler.ProductHandler
 	Categories *handler.CategoryHandler
+	Auth       *handler.AuthHandler
+	Tokens     auth.TokenParser
 }
 
 // NewRouter godoc
 //
-//	@title			E-Commerce API
-//	@version		1.0
-//	@description	Product catalog, search and checkout API. Errors follow RFC 9457 (application/problem+json).
+//	@title						E-Commerce API
+//	@version					1.0
+//	@description				Product catalog, search and checkout API. Errors follow RFC 9457 (application/problem+json).
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Access token from /api/v1/auth/login, sent as "Bearer <token>".
 func NewRouter(d RouterDeps) *gin.Engine {
 	if d.Production {
 		gin.SetMode(gin.ReleaseMode)
@@ -60,8 +69,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	r.GET("/swagger/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
 
 	api := r.Group("/api/v1")
-	d.Products.Register(api)
-	d.Categories.Register(api)
+	d.Auth.Register(api, d.Tokens)
+	d.Products.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermProductsWrite))
+	d.Categories.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermCategoriesWrite))
 
 	return r
 }

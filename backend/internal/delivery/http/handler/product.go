@@ -18,13 +18,14 @@ func NewProductHandler(products ProductService) *ProductHandler {
 	return &ProductHandler{products: products}
 }
 
-func (h *ProductHandler) Register(r gin.IRouter) {
+func (h *ProductHandler) Register(r gin.IRouter, write ...gin.HandlerFunc) {
 	g := r.Group("/products")
 	g.GET("", h.List)
-	g.POST("", h.Create)
 	g.GET("/:id", h.Get)
-	g.PUT("/:id", h.Update)
-	g.DELETE("/:id", h.Delete)
+	w := g.Group("", write...)
+	w.POST("", h.Create)
+	w.PUT("/:id", h.Update)
+	w.DELETE("/:id", h.Delete)
 }
 
 // List godoc
@@ -102,6 +103,9 @@ func (h *ProductHandler) Get(c *gin.Context) {
 //	@Failure		415		{object}	response.Problem	"Content-Type is not application/json"
 //	@Failure		422		{object}	response.Problem	"Validation failed"
 //	@Failure		500		{object}	response.Problem
+//	@Security		BearerAuth
+//	@Failure		401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure		403	{object}	response.Problem	"Insufficient permissions"
 //	@Router			/api/v1/products [post]
 func (h *ProductHandler) Create(c *gin.Context) {
 	var req dto.ProductRequest
@@ -141,6 +145,9 @@ func (h *ProductHandler) Create(c *gin.Context) {
 //	@Failure		415		{object}	response.Problem	"Content-Type is not application/json"
 //	@Failure		422		{object}	response.Problem	"Validation failed"
 //	@Failure		500		{object}	response.Problem
+//	@Security		BearerAuth
+//	@Failure		401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure		403	{object}	response.Problem	"Insufficient permissions"
 //	@Router			/api/v1/products/{id} [put]
 func (h *ProductHandler) Update(c *gin.Context) {
 	id, err := response.PathUUID(c, "id")
@@ -177,6 +184,9 @@ func (h *ProductHandler) Update(c *gin.Context) {
 //	@Failure		400	{object}	response.Problem	"Invalid ID"
 //	@Failure		404	{object}	response.Problem	"Product not found"
 //	@Failure		500	{object}	response.Problem
+//	@Security		BearerAuth
+//	@Failure		401	{object}	response.Problem	"Missing or invalid token"
+//	@Failure		403	{object}	response.Problem	"Insufficient permissions"
 //	@Router			/api/v1/products/{id} [delete]
 func (h *ProductHandler) Delete(c *gin.Context) {
 	id, err := response.PathUUID(c, "id")

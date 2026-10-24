@@ -15,6 +15,7 @@ import (
 	"e-commerce-backend/internal/delivery/http/handler"
 	"e-commerce-backend/internal/repository/postgres"
 	"e-commerce-backend/internal/repository/redis"
+	"e-commerce-backend/internal/security"
 	"e-commerce-backend/internal/usecase"
 )
 
@@ -23,6 +24,7 @@ const (
 	shutdownTimeout   = 15 * time.Second
 	readinessTimeout  = 2 * time.Second
 	connectTimeout    = 10 * time.Second
+	accessTokenTTL    = 15 * time.Minute
 )
 
 func Run(ctx context.Context, cfg config.Config) error {
@@ -52,6 +54,17 @@ func Run(ctx context.Context, cfg config.Config) error {
 		}
 	}()
 
+	jwt := security.NewJWTManager(cfg.Auth.JWTSecret, accessTokenTTL)
+	authService := usecase.NewAuthService(
+		postgres.NewUserRepository(db),
+		security.NewBcryptHasher(),
+		jwt,
+		redis.NewRefreshTokenStore(rdb),
+	)
+	if err := authService.EnsureSuperAdmin(connectCtx, cfg.Auth.SuperAdminEmail, cfg.Auth.SuperAdminPassword); err != nil {
+		return fmt.Errorf("ensure superadmin: %w", err)
+	}
+
 	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     log,
 		Production: cfg.IsProduction(),
@@ -61,6 +74,8 @@ func Run(ctx context.Context, cfg config.Config) error {
 		),
 		Products:   handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
 		Categories: handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
+		Auth:       handler.NewAuthHandler(authService),
+		Tokens:     jwt,
 	})
 
 	srv := &http.Server{

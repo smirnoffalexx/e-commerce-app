@@ -25,7 +25,17 @@ type CategoryService interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+type AuthService interface {
+	Register(ctx context.Context, email, password string) (domain.User, error)
+	Login(ctx context.Context, email, password string) (usecase.Session, error)
+	Refresh(ctx context.Context, refreshToken string) (usecase.Session, error)
+	Logout(ctx context.Context, refreshToken string) error
+	Me(ctx context.Context, userID uuid.UUID) (domain.User, error)
+	ChangePassword(ctx context.Context, userID uuid.UUID, current, next string) (usecase.Session, error)
+}
+
 var (
 	_ ProductService  = (*usecase.ProductService)(nil)
 	_ CategoryService = (*usecase.CategoryService)(nil)
+	_ AuthService     = (*usecase.AuthService)(nil)
 )

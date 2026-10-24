@@ -7,6 +7,9 @@ SWAG := $(CURDIR)/bin/swag
 
 COMPOSE := docker compose -f ../docker-compose.yml
 
+-include ../.env
+export
+
 .PHONY: run build test test-integration lint lint-fix mocks swagger tools infra-up infra-down migrate-up
 
 infra-up:

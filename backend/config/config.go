@@ -15,6 +15,7 @@ type Config struct {
 	LogLevel string   `envconfig:"LOG_LEVEL" default:"info"`
 	Postgres Postgres `ignored:"true"`
 	Redis    Redis    `ignored:"true"`
+	Auth     Auth     `ignored:"true"`
 }
 
 type Postgres struct {
@@ -32,12 +33,23 @@ type Redis struct {
 	DB       int    `envconfig:"REDIS_DB" default:"0"`
 }
 
+type Auth struct {
+	JWTSecret          string `envconfig:"JWT_SECRET" required:"true"`
+	SuperAdminEmail    string `envconfig:"SUPERADMIN_EMAIL"`
+	SuperAdminPassword string `envconfig:"SUPERADMIN_PASSWORD"`
+}
+
+const minJWTSecretLen = 32
+
 func Load() (Config, error) {
 	var cfg Config
-	for _, target := range []any{&cfg, &cfg.Postgres, &cfg.Redis} {
+	for _, target := range []any{&cfg, &cfg.Postgres, &cfg.Redis, &cfg.Auth} {
 		if err := envconfig.Process("", target); err != nil {
 			return Config{}, fmt.Errorf("load config: %w", err)
 		}
+	}
+	if len(cfg.Auth.JWTSecret) < minJWTSecretLen {
+		return Config{}, fmt.Errorf("load config: JWT_SECRET must be at least %d bytes", minJWTSecretLen)
 	}
 	return cfg, nil
 }
