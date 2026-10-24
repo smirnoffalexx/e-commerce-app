@@ -29,24 +29,26 @@ type healthResponse struct {
 }
 
 // Liveness godoc
-// @Summary      Liveness probe
-// @Description  Reports that the process is running. Does not check dependencies.
-// @Tags         health
-// @Produce      json
-// @Success      200  {object}  healthResponse
-// @Router       /healthz [get]
+//
+//	@Summary		Liveness probe
+//	@Description	Reports that the process is running. Does not check dependencies.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	healthResponse
+//	@Router			/healthz [get]
 func (h *HealthHandler) Liveness(c *gin.Context) {
 	c.JSON(http.StatusOK, healthResponse{Status: "ok"})
 }
 
 // Readiness godoc
-// @Summary      Readiness probe
-// @Description  Reports whether all dependencies (database, cache) are reachable.
-// @Tags         health
-// @Produce      json
-// @Success      200  {object}  healthResponse
-// @Failure      503  {object}  healthResponse
-// @Router       /readyz [get]
+//
+//	@Summary		Readiness probe
+//	@Description	Reports whether all dependencies (database, cache) are reachable.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	healthResponse
+//	@Failure		503	{object}	healthResponse
+//	@Router			/readyz [get]
 func (h *HealthHandler) Readiness(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), h.timeout)
 	defer cancel()

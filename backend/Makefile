@@ -2,10 +2,12 @@ GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := $(CURDIR)/bin/golangci-lint
 MOCKERY_VERSION := v3.8.1
 MOCKERY := $(CURDIR)/bin/mockery
+SWAG_VERSION := v1.16.6
+SWAG := $(CURDIR)/bin/swag
 
 COMPOSE := docker compose -f ../docker-compose.yml
 
-.PHONY: run build test test-integration lint lint-fix mocks tools infra-up infra-down migrate-up
+.PHONY: run build test test-integration lint lint-fix mocks swagger tools infra-up infra-down migrate-up
 
 infra-up:
 	$(COMPOSE) up -d --wait postgres redis
@@ -38,7 +40,14 @@ lint-fix: $(GOLANGCI_LINT)
 mocks: $(MOCKERY)
 	$(MOCKERY)
 
-tools: $(GOLANGCI_LINT) $(MOCKERY)
+swagger: $(SWAG)
+	$(SWAG) fmt -d ./internal/delivery/http
+	$(SWAG) init -g internal/delivery/http/router.go -o docs --outputTypes go,yaml
+
+tools: $(GOLANGCI_LINT) $(MOCKERY) $(SWAG)
+
+$(SWAG):
+	GOBIN=$(CURDIR)/bin go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
 
 $(MOCKERY):
 	GOBIN=$(CURDIR)/bin go install github.com/vektra/mockery/v3@$(MOCKERY_VERSION)

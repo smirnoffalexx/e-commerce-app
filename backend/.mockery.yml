@@ -6,3 +6,6 @@ structname: "{{.InterfaceName}}"
 template: testify
 packages:
   e-commerce-backend/internal/usecase: {}
+  e-commerce-backend/internal/delivery/http/handler:
+    config:
+      include-interface-regex: "Service$"

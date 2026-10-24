@@ -8,6 +8,7 @@
 !.env.example
 
 backend/bin/
+backend/docs/
 backend/coverage.out
 backend/coverage.html
 

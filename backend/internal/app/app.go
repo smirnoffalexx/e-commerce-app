@@ -15,6 +15,7 @@ import (
 	"e-commerce-backend/internal/delivery/http/handler"
 	"e-commerce-backend/internal/repository/postgres"
 	"e-commerce-backend/internal/repository/redis"
+	"e-commerce-backend/internal/usecase"
 )
 
 const (
@@ -58,6 +59,8 @@ func Run(ctx context.Context, cfg config.Config) error {
 			postgres.NewHealthChecker(db),
 			redis.NewHealthChecker(rdb),
 		),
+		Products:   handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
+		Categories: handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
 	})
 
 	srv := &http.Server{

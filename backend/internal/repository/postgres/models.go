@@ -54,8 +54,8 @@ func categoryToDomain(m *categoryModel) domain.Category {
 		ID:        m.ID,
 		Name:      m.Name,
 		Slug:      m.Slug,
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
+		CreatedAt: m.CreatedAt.UTC(),
+		UpdatedAt: m.UpdatedAt.UTC(),
 	}
 }
 
@@ -86,8 +86,8 @@ func productToDomain(m *productModel) domain.Product {
 		Stock:       m.Stock,
 		WeightKg:    m.WeightKg,
 		Version:     m.Version,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
+		CreatedAt:   m.CreatedAt.UTC(),
+		UpdatedAt:   m.UpdatedAt.UTC(),
 	}
 	if m.Category != nil {
 		c := categoryToDomain(m.Category)

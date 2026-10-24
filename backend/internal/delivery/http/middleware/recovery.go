@@ -2,13 +2,12 @@ package middleware
 
 import (
 	"log/slog"
-	"net/http"
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 )
 
-func Recovery(log *slog.Logger) gin.HandlerFunc {
+func Recovery(log *slog.Logger, onPanic func(c *gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -17,15 +16,11 @@ func Recovery(log *slog.Logger) gin.HandlerFunc {
 					slog.Any("panic", rec),
 					slog.String("stack", string(debug.Stack())),
 				)
-				if !c.Writer.Written() {
-					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-						"status":     http.StatusInternalServerError,
-						"title":      "Internal Server Error",
-						"request_id": GetRequestID(c),
-					})
+				if c.Writer.Written() {
+					c.Abort()
 					return
 				}
-				c.Abort()
+				onPanic(c)
 			}
 		}()
 		c.Next()
