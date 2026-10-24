@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"io"
 
 	"github.com/google/uuid"
 
@@ -41,9 +42,14 @@ type AdminService interface {
 	SetActive(ctx context.Context, id uuid.UUID, active bool) (domain.User, error)
 }
 
+type CatalogImportService interface {
+	Import(ctx context.Context, r io.Reader, opts usecase.ImportOptions) (usecase.ImportReport, error)
+}
+
 var (
-	_ AdminService    = (*usecase.AdminService)(nil)
-	_ ProductService  = (*usecase.ProductService)(nil)
-	_ CategoryService = (*usecase.CategoryService)(nil)
-	_ AuthService     = (*usecase.AuthService)(nil)
+	_ CatalogImportService = (*usecase.CatalogImportService)(nil)
+	_ AdminService         = (*usecase.AdminService)(nil)
+	_ ProductService       = (*usecase.ProductService)(nil)
+	_ CategoryService      = (*usecase.CategoryService)(nil)
+	_ AuthService          = (*usecase.AuthService)(nil)
 )

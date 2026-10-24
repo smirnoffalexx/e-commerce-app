@@ -1,10 +1,12 @@
 package http_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,6 +38,7 @@ type testAPI struct {
 	categories *mocks.CategoryService
 	auth       *mocks.AuthService
 	admins     *mocks.AdminService
+	imports    *mocks.CatalogImportService
 }
 
 type stubTokens struct{}
@@ -60,6 +63,7 @@ func newTestAPI(t *testing.T) *testAPI {
 	categories := mocks.NewCategoryService(t)
 	authSvc := mocks.NewAuthService(t)
 	adminSvc := mocks.NewAdminService(t)
+	importSvc := mocks.NewCatalogImportService(t)
 	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     slog.New(slog.DiscardHandler),
 		Health:     handler.NewHealthHandler(time.Second),
@@ -67,10 +71,11 @@ func newTestAPI(t *testing.T) *testAPI {
 		Categories: handler.NewCategoryHandler(categories),
 		Auth:       handler.NewAuthHandler(authSvc),
 		Admins:     handler.NewAdminHandler(adminSvc),
+		Imports:    handler.NewCatalogImportHandler(importSvc),
 		Tokens:     stubTokens{},
 	})
 	require.NoError(t, err)
-	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc}
+	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc, imports: importSvc}
 }
 
 func (a *testAPI) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {
@@ -431,4 +436,92 @@ func TestCreateAdmin_ResponseIsNotCached(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code)
 	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	assert.Contains(t, w.Body.String(), `"temporary_password":"Kd7mQx2RtLp9WzHn"`)
+}
+
+func multipartBody(t *testing.T, filename string, content []byte) (*bytes.Buffer, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, err := w.CreateFormFile("file", filename)
+	require.NoError(t, err)
+	_, err = part.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	return &buf, w.FormDataContentType()
+}
+
+func (a *testAPI) upload(path, filename string, content []byte, token string, t *testing.T) *httptest.ResponseRecorder {
+	body, contentType := multipartBody(t, filename, content)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, path, body)
+	req.Header.Set("Content-Type", contentType)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	a.router.ServeHTTP(w, req)
+	return w
+}
+
+func TestImport_PassesOptionsAndReturnsReport(t *testing.T) {
+	api := newTestAPI(t)
+	api.imports.EXPECT().Import(mock.Anything, mock.Anything, usecase.ImportOptions{
+		Mode: usecase.ImportModeSkip, DryRun: true, Atomic: true, CreateMissingCategories: true,
+	}).Return(usecase.ImportReport{
+		Options: usecase.ImportOptions{Mode: usecase.ImportModeSkip, DryRun: true},
+		Created: 2,
+		Failed:  1,
+		Errors:  []usecase.ImportRowError{{Line: 7, SKU: "YM-015", Field: "price", Code: "invalid_format", Message: "bad"}},
+	}, nil)
+
+	w := api.upload("/api/v1/products/import?mode=skip&dry_run=true&atomic=1&create_missing_categories=true", "catalog.CSV", []byte("x"), "admin", t)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `"committed":false`)
+	assert.Contains(t, w.Body.String(), `"errors":[{"line":7,"sku":"YM-015","field":"price","code":"invalid_format","message":"bad"}]`)
+}
+
+func TestImport_RejectsBadUploads(t *testing.T) {
+	t.Run("customer cannot import", func(t *testing.T) {
+		w := newTestAPI(t).upload("/api/v1/products/import", "a.csv", []byte("x"), "user", t)
+		require.Equal(t, http.StatusForbidden, w.Code)
+	})
+
+	t.Run("json body instead of multipart", func(t *testing.T) {
+		w := newTestAPI(t).do(http.MethodPost, "/api/v1/products/import", `{}`)
+		require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
+	})
+
+	t.Run("wrong extension", func(t *testing.T) {
+		w := newTestAPI(t).upload("/api/v1/products/import", "catalog.xlsx", []byte("x"), "admin", t)
+		require.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		assert.Equal(t, map[string]string{"file": domain.CodeInvalidFormat}, fieldCodes(decodeProblem(t, w)))
+	})
+
+	t.Run("file too large", func(t *testing.T) {
+		w := newTestAPI(t).upload("/api/v1/products/import", "big.csv", bytes.Repeat([]byte("a"), handler.MaxImportFileBytes+1), "admin", t)
+		require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+		assert.Equal(t, "file_too_large", decodeProblem(t, w).Code)
+	})
+
+	t.Run("missing file field", func(t *testing.T) {
+		api := newTestAPI(t)
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		require.NoError(t, mw.WriteField("note", "no file"))
+		require.NoError(t, mw.Close())
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/products/import", &buf)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer admin")
+		w := httptest.NewRecorder()
+		api.router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, map[string]string{"file": domain.CodeRequired}, fieldCodes(decodeProblem(t, w)))
+	})
+
+	t.Run("malformed boolean", func(t *testing.T) {
+		w := newTestAPI(t).upload("/api/v1/products/import?dry_run=maybe", "a.csv", []byte("x"), "admin", t)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, map[string]string{"dry_run": domain.CodeInvalidFormat}, fieldCodes(decodeProblem(t, w)))
+	})
 }

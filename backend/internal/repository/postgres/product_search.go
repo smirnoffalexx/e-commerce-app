@@ -45,7 +45,7 @@ func (r *ProductRepository) List(ctx context.Context, f domain.ProductFilter) ([
 		models []productModel
 		total  int64
 	)
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := conn(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		search := exactSearch(f.Query)
 		q := applyProductFilter(tx.Model(&productModel{}), &f, search)
 		if err := q.Count(&total).Error; err != nil {

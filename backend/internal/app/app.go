@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"e-commerce-backend/config"
+	"e-commerce-backend/internal/csvimport"
 	httpdelivery "e-commerce-backend/internal/delivery/http"
 	"e-commerce-backend/internal/delivery/http/handler"
 	"e-commerce-backend/internal/repository/postgres"
@@ -56,11 +57,24 @@ func Run(ctx context.Context, cfg config.Config) error {
 
 	jwt := security.NewJWTManager(cfg.Auth.JWTSecret, accessTokenTTL)
 	users := postgres.NewUserRepository(db)
+	products := postgres.NewProductRepository(db)
+	categories := postgres.NewCategoryRepository(db)
 	hasher := security.NewBcryptHasher()
 	refreshTokens := redis.NewRefreshTokenStore(rdb)
 	authService := usecase.NewAuthService(users, hasher, jwt, refreshTokens)
 	if err := authService.EnsureSuperAdmin(connectCtx, cfg.Auth.SuperAdminEmail, cfg.Auth.SuperAdminPassword); err != nil {
 		return fmt.Errorf("ensure superadmin: %w", err)
+	}
+
+	importService := usecase.NewCatalogImportService(
+		csvimport.NewParser(),
+		postgres.NewTransactor(db),
+		postgres.NewCatalogImportRepository(db),
+		categories,
+		products,
+	)
+	if err := seedDemoCatalog(ctx, log, cfg.SeedDemoFile, products, importService); err != nil {
+		return fmt.Errorf("seed demo catalog: %w", err)
 	}
 
 	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
@@ -70,9 +84,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 			postgres.NewHealthChecker(db),
 			redis.NewHealthChecker(rdb),
 		),
-		Products:       handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
-		Categories:     handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
+		Products:       handler.NewProductHandler(usecase.NewProductService(products)),
+		Categories:     handler.NewCategoryHandler(usecase.NewCategoryService(categories)),
 		Auth:           handler.NewAuthHandler(authService),
+		Imports:        handler.NewCatalogImportHandler(importService),
 		Admins:         handler.NewAdminHandler(usecase.NewAdminService(users, hasher, security.NewTempPasswordGenerator(), refreshTokens)),
 		Tokens:         jwt,
 		Limiter:        redis.NewRateLimiter(rdb),

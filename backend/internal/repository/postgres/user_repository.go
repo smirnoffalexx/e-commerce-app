@@ -69,7 +69,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 
 func (r *UserRepository) Create(ctx context.Context, u *domain.User) error {
 	m := userToModel(u)
-	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+	if err := conn(ctx, r.db).Create(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return domain.ErrEmailTaken
 		}
@@ -88,7 +88,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (domain.U
 }
 
 func (r *UserRepository) ListByRole(ctx context.Context, role domain.Role, limit, offset int) ([]domain.User, int64, error) {
-	q := r.db.WithContext(ctx).Model(&userModel{}).Where("role = ?", string(role))
+	q := conn(ctx, r.db).Model(&userModel{}).Where("role = ?", string(role))
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -108,7 +108,7 @@ func (r *UserRepository) ListByRole(ctx context.Context, role domain.Role, limit
 }
 
 func (r *UserRepository) Update(ctx context.Context, u *domain.User) error {
-	res := r.db.WithContext(ctx).
+	res := conn(ctx, r.db).
 		Model(&userModel{}).
 		Where("id = ?", u.ID).
 		Updates(map[string]any{
@@ -130,7 +130,7 @@ func (r *UserRepository) Update(ctx context.Context, u *domain.User) error {
 
 func (r *UserRepository) get(ctx context.Context, query string, arg any) (domain.User, error) {
 	var m userModel
-	if err := r.db.WithContext(ctx).Take(&m, query, arg).Error; err != nil {
+	if err := conn(ctx, r.db).Take(&m, query, arg).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.User{}, domain.ErrUserNotFound
 		}

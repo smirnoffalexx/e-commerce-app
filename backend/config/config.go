@@ -14,6 +14,7 @@ type Config struct {
 	HTTPPort       int      `envconfig:"HTTP_PORT" default:"8080"`
 	LogLevel       string   `envconfig:"LOG_LEVEL" default:"info"`
 	TrustedProxies []string `envconfig:"TRUSTED_PROXIES"`
+	SeedDemoFile   string   `envconfig:"SEED_DEMO_FILE"`
 	Postgres       Postgres `ignored:"true"`
 	Redis          Redis    `ignored:"true"`
 	Auth           Auth     `ignored:"true"`

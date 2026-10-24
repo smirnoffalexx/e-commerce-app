@@ -23,7 +23,7 @@ func NewCategoryRepository(db *gorm.DB) *CategoryRepository {
 
 func (r *CategoryRepository) Create(ctx context.Context, c *domain.Category) error {
 	m := categoryToModel(c)
-	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+	if err := conn(ctx, r.db).Create(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return domain.ErrCategoryExists
 		}
@@ -35,7 +35,7 @@ func (r *CategoryRepository) Create(ctx context.Context, c *domain.Category) err
 
 func (r *CategoryRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.Category, error) {
 	var m categoryModel
-	if err := r.db.WithContext(ctx).Take(&m, "id = ?", id).Error; err != nil {
+	if err := conn(ctx, r.db).Take(&m, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Category{}, domain.ErrCategoryNotFound
 		}
@@ -51,7 +51,7 @@ func (r *CategoryRepository) GetBySlugs(ctx context.Context, slugs []string) (ma
 	}
 
 	var models []categoryModel
-	if err := r.db.WithContext(ctx).Where("slug IN ?", slugs).Find(&models).Error; err != nil {
+	if err := conn(ctx, r.db).Where("slug IN ?", slugs).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("get categories by slugs: %w", err)
 	}
 	for i := range models {
@@ -62,7 +62,7 @@ func (r *CategoryRepository) GetBySlugs(ctx context.Context, slugs []string) (ma
 
 func (r *CategoryRepository) List(ctx context.Context) ([]domain.Category, error) {
 	var models []categoryModel
-	if err := r.db.WithContext(ctx).Order("name ASC").Find(&models).Error; err != nil {
+	if err := conn(ctx, r.db).Order("name ASC").Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("list categories: %w", err)
 	}
 
@@ -74,7 +74,7 @@ func (r *CategoryRepository) List(ctx context.Context) ([]domain.Category, error
 }
 
 func (r *CategoryRepository) Update(ctx context.Context, c *domain.Category) error {
-	res := r.db.WithContext(ctx).
+	res := conn(ctx, r.db).
 		Model(&categoryModel{}).
 		Where("id = ?", c.ID).
 		Updates(map[string]any{"name": c.Name, "slug": c.Slug, "updated_at": gorm.Expr("now()")})
@@ -91,7 +91,7 @@ func (r *CategoryRepository) Update(ctx context.Context, c *domain.Category) err
 }
 
 func (r *CategoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return conn(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		var m categoryModel
 		err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Take(&m, "id = ?", id).Error
 		if err != nil {

@@ -22,7 +22,7 @@ func NewProductRepository(db *gorm.DB) *ProductRepository {
 }
 
 func (r *ProductRepository) Create(ctx context.Context, p *domain.Product) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return conn(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		category, err := lockActiveCategory(tx, p.CategoryID)
 		if err != nil {
 			return err
@@ -44,7 +44,7 @@ func (r *ProductRepository) Create(ctx context.Context, p *domain.Product) error
 
 func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.Product, error) {
 	var m productModel
-	err := r.withCategory(r.db.WithContext(ctx)).Take(&m, "id = ?", id).Error
+	err := r.withCategory(conn(ctx, r.db)).Take(&m, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Product{}, domain.ErrProductNotFound
@@ -55,7 +55,7 @@ func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.P
 }
 
 func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return conn(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		category, err := lockActiveCategory(tx, p.CategoryID)
 		if err != nil {
 			return err
@@ -95,7 +95,7 @@ func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error
 }
 
 func (r *ProductRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Delete(&productModel{}, "id = ?", id)
+	res := conn(ctx, r.db).Delete(&productModel{}, "id = ?", id)
 	if res.Error != nil {
 		return fmt.Errorf("delete product: %w", res.Error)
 	}

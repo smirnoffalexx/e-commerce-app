@@ -53,3 +53,14 @@ type RefreshTokenStore interface {
 	Revoke(ctx context.Context, token string) error
 	RevokeAll(ctx context.Context, userID uuid.UUID) error
 }
+
+type Transactor interface {
+	WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type CatalogImportRepository interface {
+	LockCatalogImport(ctx context.Context) error
+	CategoriesBySlugs(ctx context.Context, slugs []string) (map[string]domain.Category, error)
+	ProductsBySKUs(ctx context.Context, skus []string) (map[string]domain.Product, error)
+	CreateProducts(ctx context.Context, products []domain.Product) error
+}
