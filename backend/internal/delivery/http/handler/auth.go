@@ -19,16 +19,18 @@ func NewAuthHandler(svc AuthService) *AuthHandler {
 	return &AuthHandler{auth: svc}
 }
 
-func (h *AuthHandler) Register(r gin.IRouter, parser auth.TokenParser) {
+func (h *AuthHandler) Register(r gin.IRouter, parser auth.TokenParser, sensitive ...gin.HandlerFunc) {
 	g := r.Group("/auth")
-	g.POST("/register", h.SignUp)
-	g.POST("/login", h.Login)
-	g.POST("/refresh", h.Refresh)
 	g.POST("/logout", h.Logout)
+
+	limited := g.Group("", sensitive...)
+	limited.POST("/register", h.SignUp)
+	limited.POST("/login", h.Login)
+	limited.POST("/refresh", h.Refresh)
 
 	session := g.Group("", auth.AuthenticateAllowingPasswordChange(parser))
 	session.GET("/me", h.Me)
-	session.POST("/change-password", h.ChangePassword)
+	session.Group("", sensitive...).POST("/change-password", h.ChangePassword)
 }
 
 // SignUp godoc
@@ -44,6 +46,7 @@ func (h *AuthHandler) Register(r gin.IRouter, parser auth.TokenParser) {
 //	@Failure		409		{object}	response.Problem	"Email already registered"
 //	@Failure		422		{object}	response.Problem	"Invalid email or weak password"
 //	@Failure		500		{object}	response.Problem
+//	@Failure		429		{object}	response.Problem	"Too many attempts (10 per minute per IP)"
 //	@Router			/api/v1/auth/register [post]
 func (h *AuthHandler) SignUp(c *gin.Context) {
 	var req dto.CredentialsRequest
@@ -71,6 +74,7 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 //	@Failure		400		{object}	response.Problem	"Malformed JSON"
 //	@Failure		401		{object}	response.Problem	"Invalid credentials or expired temporary password"
 //	@Failure		500		{object}	response.Problem
+//	@Failure		429		{object}	response.Problem	"Too many attempts (10 per minute per IP)"
 //	@Router			/api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.CredentialsRequest
@@ -99,6 +103,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 //	@Failure		400		{object}	response.Problem	"Malformed JSON"
 //	@Failure		401		{object}	response.Problem	"Invalid or reused refresh token"
 //	@Failure		500		{object}	response.Problem
+//	@Failure		429		{object}	response.Problem	"Too many attempts (10 per minute per IP)"
 //	@Router			/api/v1/auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req dto.RefreshRequest
@@ -173,6 +178,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 //	@Failure		401		{object}	response.Problem	"Missing or invalid token"
 //	@Failure		422		{object}	response.Problem	"Wrong current password or weak new password"
 //	@Failure		500		{object}	response.Problem
+//	@Failure		429		{object}	response.Problem	"Too many attempts (10 per minute per IP)"
 //	@Router			/api/v1/auth/change-password [post]
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req dto.ChangePasswordRequest

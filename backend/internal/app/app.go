@@ -63,19 +63,24 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return fmt.Errorf("ensure superadmin: %w", err)
 	}
 
-	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
+	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     log,
 		Production: cfg.IsProduction(),
 		Health: handler.NewHealthHandler(readinessTimeout,
 			postgres.NewHealthChecker(db),
 			redis.NewHealthChecker(rdb),
 		),
-		Products:   handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
-		Categories: handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
-		Auth:       handler.NewAuthHandler(authService),
-		Admins:     handler.NewAdminHandler(usecase.NewAdminService(users, hasher, security.NewTempPasswordGenerator(), refreshTokens)),
-		Tokens:     jwt,
+		Products:       handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
+		Categories:     handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
+		Auth:           handler.NewAuthHandler(authService),
+		Admins:         handler.NewAdminHandler(usecase.NewAdminService(users, hasher, security.NewTempPasswordGenerator(), refreshTokens)),
+		Tokens:         jwt,
+		Limiter:        redis.NewRateLimiter(rdb),
+		TrustedProxies: cfg.TrustedProxies,
 	})
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.HTTPPort),

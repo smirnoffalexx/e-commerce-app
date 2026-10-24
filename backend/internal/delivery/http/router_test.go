@@ -60,7 +60,7 @@ func newTestAPI(t *testing.T) *testAPI {
 	categories := mocks.NewCategoryService(t)
 	authSvc := mocks.NewAuthService(t)
 	adminSvc := mocks.NewAdminService(t)
-	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
+	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     slog.New(slog.DiscardHandler),
 		Health:     handler.NewHealthHandler(time.Second),
 		Products:   handler.NewProductHandler(products),
@@ -69,6 +69,7 @@ func newTestAPI(t *testing.T) *testAPI {
 		Admins:     handler.NewAdminHandler(adminSvc),
 		Tokens:     stubTokens{},
 	})
+	require.NoError(t, err)
 	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc}
 }
 

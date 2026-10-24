@@ -10,12 +10,13 @@ import (
 )
 
 type Config struct {
-	Env      string   `envconfig:"APP_ENV" default:"development"`
-	HTTPPort int      `envconfig:"HTTP_PORT" default:"8080"`
-	LogLevel string   `envconfig:"LOG_LEVEL" default:"info"`
-	Postgres Postgres `ignored:"true"`
-	Redis    Redis    `ignored:"true"`
-	Auth     Auth     `ignored:"true"`
+	Env            string   `envconfig:"APP_ENV" default:"development"`
+	HTTPPort       int      `envconfig:"HTTP_PORT" default:"8080"`
+	LogLevel       string   `envconfig:"LOG_LEVEL" default:"info"`
+	TrustedProxies []string `envconfig:"TRUSTED_PROXIES"`
+	Postgres       Postgres `ignored:"true"`
+	Redis          Redis    `ignored:"true"`
+	Auth           Auth     `ignored:"true"`
 }
 
 type Postgres struct {
