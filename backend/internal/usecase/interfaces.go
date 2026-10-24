@@ -30,6 +30,7 @@ type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 	GetByEmail(ctx context.Context, email string) (domain.User, error)
+	ListByRole(ctx context.Context, role domain.Role, limit, offset int) ([]domain.User, int64, error)
 	Update(ctx context.Context, u *domain.User) error
 }
 
@@ -40,6 +41,10 @@ type PasswordHasher interface {
 
 type AccessTokenIssuer interface {
 	Issue(u *domain.User) (token string, expiresAt time.Time, err error)
+}
+
+type TempPasswordGenerator interface {
+	Generate() (string, error)
 }
 
 type RefreshTokenStore interface {

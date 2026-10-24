@@ -55,12 +55,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}()
 
 	jwt := security.NewJWTManager(cfg.Auth.JWTSecret, accessTokenTTL)
-	authService := usecase.NewAuthService(
-		postgres.NewUserRepository(db),
-		security.NewBcryptHasher(),
-		jwt,
-		redis.NewRefreshTokenStore(rdb),
-	)
+	users := postgres.NewUserRepository(db)
+	hasher := security.NewBcryptHasher()
+	refreshTokens := redis.NewRefreshTokenStore(rdb)
+	authService := usecase.NewAuthService(users, hasher, jwt, refreshTokens)
 	if err := authService.EnsureSuperAdmin(connectCtx, cfg.Auth.SuperAdminEmail, cfg.Auth.SuperAdminPassword); err != nil {
 		return fmt.Errorf("ensure superadmin: %w", err)
 	}
@@ -75,6 +73,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		Products:   handler.NewProductHandler(usecase.NewProductService(postgres.NewProductRepository(db))),
 		Categories: handler.NewCategoryHandler(usecase.NewCategoryService(postgres.NewCategoryRepository(db))),
 		Auth:       handler.NewAuthHandler(authService),
+		Admins:     handler.NewAdminHandler(usecase.NewAdminService(users, hasher, security.NewTempPasswordGenerator(), refreshTokens)),
 		Tokens:     jwt,
 	})
 

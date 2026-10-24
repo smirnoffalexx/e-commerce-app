@@ -87,6 +87,26 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (domain.U
 	return r.get(ctx, "email = ?", domain.NormalizeEmail(email))
 }
 
+func (r *UserRepository) ListByRole(ctx context.Context, role domain.Role, limit, offset int) ([]domain.User, int64, error) {
+	q := r.db.WithContext(ctx).Model(&userModel{}).Where("role = ?", string(role))
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	var models []userModel
+	if err := q.Order("created_at DESC, id DESC").Limit(limit).Offset(offset).Find(&models).Error; err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+
+	users := make([]domain.User, 0, len(models))
+	for i := range models {
+		users = append(users, userToDomain(&models[i]))
+	}
+	return users, total, nil
+}
+
 func (r *UserRepository) Update(ctx context.Context, u *domain.User) error {
 	res := r.db.WithContext(ctx).
 		Model(&userModel{}).

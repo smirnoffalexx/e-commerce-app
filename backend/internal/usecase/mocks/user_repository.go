@@ -237,6 +237,92 @@ func (_c *UserRepository_GetByID_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// ListByRole provides a mock function for the type UserRepository
+func (_mock *UserRepository) ListByRole(ctx context.Context, role domain.Role, limit int, offset int) ([]domain.User, int64, error) {
+	ret := _mock.Called(ctx, role, limit, offset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListByRole")
+	}
+
+	var r0 []domain.User
+	var r1 int64
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Role, int, int) ([]domain.User, int64, error)); ok {
+		return returnFunc(ctx, role, limit, offset)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Role, int, int) []domain.User); ok {
+		r0 = returnFunc(ctx, role, limit, offset)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]domain.User)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.Role, int, int) int64); ok {
+		r1 = returnFunc(ctx, role, limit, offset)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, domain.Role, int, int) error); ok {
+		r2 = returnFunc(ctx, role, limit, offset)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// UserRepository_ListByRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByRole'
+type UserRepository_ListByRole_Call struct {
+	*mock.Call
+}
+
+// ListByRole is a helper method to define mock.On call
+//   - ctx context.Context
+//   - role domain.Role
+//   - limit int
+//   - offset int
+func (_e *UserRepository_Expecter) ListByRole(ctx any, role any, limit any, offset any) *UserRepository_ListByRole_Call {
+	return &UserRepository_ListByRole_Call{Call: _e.mock.On("ListByRole", ctx, role, limit, offset)}
+}
+
+func (_c *UserRepository_ListByRole_Call) Run(run func(ctx context.Context, role domain.Role, limit int, offset int)) *UserRepository_ListByRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 domain.Role
+		if args[1] != nil {
+			arg1 = args[1].(domain.Role)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *UserRepository_ListByRole_Call) Return(users []domain.User, n int64, err error) *UserRepository_ListByRole_Call {
+	_c.Call.Return(users, n, err)
+	return _c
+}
+
+func (_c *UserRepository_ListByRole_Call) RunAndReturn(run func(ctx context.Context, role domain.Role, limit int, offset int) ([]domain.User, int64, error)) *UserRepository_ListByRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function for the type UserRepository
 func (_mock *UserRepository) Update(ctx context.Context, u *domain.User) error {
 	ret := _mock.Called(ctx, u)

@@ -83,6 +83,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, dto.NewSessionResponse(&s, time.Now()))
 }
 
@@ -110,6 +111,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, dto.NewSessionResponse(&s, time.Now()))
 }
 
@@ -184,5 +186,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, dto.NewSessionResponse(&s, time.Now()))
 }

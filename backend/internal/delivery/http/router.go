@@ -23,6 +23,7 @@ type RouterDeps struct {
 	Products   *handler.ProductHandler
 	Categories *handler.CategoryHandler
 	Auth       *handler.AuthHandler
+	Admins     *handler.AdminHandler
 	Tokens     auth.TokenParser
 }
 
@@ -72,6 +73,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	d.Auth.Register(api, d.Tokens)
 	d.Products.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermProductsWrite))
 	d.Categories.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermCategoriesWrite))
+	d.Admins.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermAdminsManage))
 
 	return r
 }

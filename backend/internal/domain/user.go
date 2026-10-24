@@ -16,6 +16,7 @@ const (
 
 var (
 	ErrUserNotFound            = NewError(ErrNotFound, "user_not_found", "user not found")
+	ErrAdminNotFound           = NewError(ErrNotFound, "admin_not_found", "admin not found")
 	ErrEmailTaken              = NewError(ErrConflict, "email_taken", "user with this email already exists")
 	ErrInvalidCredentials      = NewError(ErrUnauthorized, "invalid_credentials", "invalid email or password")
 	ErrInvalidToken            = NewError(ErrUnauthorized, "invalid_token", "token is invalid or expired")

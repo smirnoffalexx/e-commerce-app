@@ -34,7 +34,15 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, userID uuid.UUID, current, next string) (usecase.Session, error)
 }
 
+type AdminService interface {
+	Create(ctx context.Context, email string) (usecase.AdminCredentials, error)
+	List(ctx context.Context, req usecase.PageRequest) (usecase.Page[domain.User], error)
+	ResetPassword(ctx context.Context, id uuid.UUID) (usecase.AdminCredentials, error)
+	SetActive(ctx context.Context, id uuid.UUID, active bool) (domain.User, error)
+}
+
 var (
+	_ AdminService    = (*usecase.AdminService)(nil)
 	_ ProductService  = (*usecase.ProductService)(nil)
 	_ CategoryService = (*usecase.CategoryService)(nil)
 	_ AuthService     = (*usecase.AuthService)(nil)

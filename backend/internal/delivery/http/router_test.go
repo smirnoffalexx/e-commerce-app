@@ -35,6 +35,7 @@ type testAPI struct {
 	products   *mocks.ProductService
 	categories *mocks.CategoryService
 	auth       *mocks.AuthService
+	admins     *mocks.AdminService
 }
 
 type stubTokens struct{}
@@ -58,15 +59,17 @@ func newTestAPI(t *testing.T) *testAPI {
 	products := mocks.NewProductService(t)
 	categories := mocks.NewCategoryService(t)
 	authSvc := mocks.NewAuthService(t)
+	adminSvc := mocks.NewAdminService(t)
 	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     slog.New(slog.DiscardHandler),
 		Health:     handler.NewHealthHandler(time.Second),
 		Products:   handler.NewProductHandler(products),
 		Categories: handler.NewCategoryHandler(categories),
 		Auth:       handler.NewAuthHandler(authSvc),
+		Admins:     handler.NewAdminHandler(adminSvc),
 		Tokens:     stubTokens{},
 	})
-	return &testAPI{router: router, products: products, categories: categories, auth: authSvc}
+	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc}
 }
 
 func (a *testAPI) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {
@@ -393,4 +396,38 @@ func TestLogin_InvalidCredentialsIs401(t *testing.T) {
 	w := api.do(http.MethodPost, "/api/v1/auth/login", `{"email":"jane@example.com","password":"wrong-password"}`, "Authorization", "")
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Equal(t, "invalid_credentials", decodeProblem(t, w).Code)
+}
+
+func TestAdminEndpoints_OnlySuperAdmin(t *testing.T) {
+	id := uuid.NewString()
+	endpoints := []struct{ method, path, body string }{
+		{http.MethodGet, "/api/v1/admins", ""},
+		{http.MethodPost, "/api/v1/admins", `{"email":"a@example.com"}`},
+		{http.MethodPost, "/api/v1/admins/" + id + "/reset-password", ""},
+		{http.MethodPost, "/api/v1/admins/" + id + "/deactivate", ""},
+		{http.MethodPost, "/api/v1/admins/" + id + "/activate", ""},
+	}
+	for _, e := range endpoints {
+		for _, token := range []string{"Bearer admin", "Bearer user"} {
+			t.Run(e.method+" "+e.path+" "+token, func(t *testing.T) {
+				w := newTestAPI(t).do(e.method, e.path, e.body, "Authorization", token)
+				require.Equal(t, http.StatusForbidden, w.Code)
+				assert.Equal(t, "insufficient_permissions", decodeProblem(t, w).Code)
+			})
+		}
+	}
+}
+
+func TestCreateAdmin_ResponseIsNotCached(t *testing.T) {
+	api := newTestAPI(t)
+	api.admins.EXPECT().Create(mock.Anything, "a@example.com").Return(usecase.AdminCredentials{
+		User:              domain.User{ID: uuid.Must(uuid.NewV7()), Email: "a@example.com", Role: domain.RoleAdmin, MustChangePassword: true},
+		TemporaryPassword: "Kd7mQx2RtLp9WzHn",
+	}, nil)
+
+	w := api.do(http.MethodPost, "/api/v1/admins", `{"email":"a@example.com"}`, "Authorization", "Bearer superadmin")
+
+	require.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	assert.Contains(t, w.Body.String(), `"temporary_password":"Kd7mQx2RtLp9WzHn"`)
 }
