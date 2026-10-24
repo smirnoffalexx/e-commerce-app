@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"e-commerce-backend/internal/domain"
 )
@@ -116,6 +117,32 @@ func (q *QueryParser) Int(name string) int {
 	if err != nil {
 		q.fields = append(q.fields, domain.FieldError{Field: name, Code: domain.CodeInvalidFormat, Message: name + " must be an integer"})
 		return 0
+	}
+	return v
+}
+
+func (q *QueryParser) Decimal(name string) *decimal.Decimal {
+	raw := strings.TrimSpace(q.c.Query(name))
+	if raw == "" {
+		return nil
+	}
+	v, err := decimal.NewFromString(raw)
+	if err != nil {
+		q.fields = append(q.fields, domain.FieldError{Field: name, Code: domain.CodeInvalidFormat, Message: name + " must be a decimal number"})
+		return nil
+	}
+	return &v
+}
+
+func (q *QueryParser) Bool(name string) bool {
+	raw := strings.TrimSpace(q.c.Query(name))
+	if raw == "" {
+		return false
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		q.fields = append(q.fields, domain.FieldError{Field: name, Code: domain.CodeInvalidFormat, Message: name + " must be true or false"})
+		return false
 	}
 	return v
 }

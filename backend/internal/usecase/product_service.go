@@ -8,11 +8,6 @@ import (
 	"e-commerce-backend/internal/domain"
 )
 
-type ListProductsQuery struct {
-	CategoryID *uuid.UUID
-	PageRequest
-}
-
 type ProductService struct {
 	products ProductRepository
 }
@@ -37,16 +32,12 @@ func (s *ProductService) Get(ctx context.Context, id uuid.UUID) (domain.Product,
 }
 
 func (s *ProductService) List(ctx context.Context, q ListProductsQuery) (Page[domain.Product], error) {
-	page, err := q.normalize()
+	filter, page, err := q.toFilter()
 	if err != nil {
 		return Page[domain.Product]{}, err
 	}
 
-	items, total, err := s.products.List(ctx, domain.ProductFilter{
-		CategoryID: q.CategoryID,
-		Limit:      page.PageSize,
-		Offset:     page.offset(),
-	})
+	items, total, err := s.products.List(ctx, filter)
 	if err != nil {
 		return Page[domain.Product]{}, err
 	}

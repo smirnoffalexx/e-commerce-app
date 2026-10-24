@@ -7,6 +7,7 @@ import (
 
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/delivery/http/response"
+	"e-commerce-backend/internal/domain"
 	"e-commerce-backend/internal/usecase"
 )
 
@@ -30,22 +31,32 @@ func (h *ProductHandler) Register(r gin.IRouter, write ...gin.HandlerFunc) {
 
 // List godoc
 //
-//	@Summary		List products
-//	@Description	Returns a page of products, newest first.
+//	@Summary		Search and list products
+//	@Description	Without q returns products newest first. With q combines PostgreSQL full-text search over name and description (stemming, websearch syntax: "quoted phrase", -exclude, OR), trigram word similarity on the name for typos and partial words, and exact/prefix SKU match. Results are ranked by relevance unless another sort is given.
 //	@Tags			products
 //	@Produce		json
-//	@Param			page		query		int		false	"Page number (1..10000)"	default(1)
-//	@Param			page_size	query		int		false	"Items per page (1..100)"	default(20)
-//	@Param			category_id	query		string	false	"Filter by category"		format(uuid)
+//	@Param			q			query		string	false	"Search text (max 200 chars)"	example(bluetooth speaker)
+//	@Param			category_id	query		string	false	"Filter by category"			format(uuid)
+//	@Param			min_price	query		string	false	"Minimum price, inclusive"		example(10.00)
+//	@Param			max_price	query		string	false	"Maximum price, inclusive"		example(99.99)
+//	@Param			in_stock	query		bool	false	"Only products with stock > 0"
+//	@Param			sort		query		string	false	"Sort order; default relevance with q, newest without"	Enums(relevance,newest,price_asc,price_desc,name_asc)
+//	@Param			page		query		int		false	"Page number (1..10000)"								default(1)
+//	@Param			page_size	query		int		false	"Items per page (1..100)"								default(20)
 //	@Success		200			{object}	dto.ProductListResponse
 //	@Failure		400			{object}	response.Problem	"Malformed query parameters"
-//	@Failure		422			{object}	response.Problem	"Paging out of range"
+//	@Failure		422			{object}	response.Problem	"Invalid search parameters"
 //	@Failure		500			{object}	response.Problem
 //	@Router			/api/v1/products [get]
 func (h *ProductHandler) List(c *gin.Context) {
 	q := response.NewQueryParser(c)
 	query := usecase.ListProductsQuery{
+		Query:       c.Query("q"),
 		CategoryID:  q.UUID("category_id"),
+		MinPrice:    q.Decimal("min_price"),
+		MaxPrice:    q.Decimal("max_price"),
+		InStock:     q.Bool("in_stock"),
+		Sort:        domain.ProductSort(c.Query("sort")),
 		PageRequest: usecase.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")},
 	}
 	if err := q.Err(); err != nil {

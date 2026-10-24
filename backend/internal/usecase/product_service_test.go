@@ -92,6 +92,7 @@ func TestProductService_List(t *testing.T) {
 				CategoryID: tc.query.CategoryID,
 				Limit:      tc.wantLimit,
 				Offset:     tc.wantOffset,
+				Sort:       domain.SortNewest,
 			}).Return([]domain.Product{}, 45, nil)
 
 			page, err := usecase.NewProductService(repo).List(ctx, tc.query)

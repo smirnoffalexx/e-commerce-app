@@ -54,37 +54,6 @@ func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.P
 	return productToDomain(&m), nil
 }
 
-func (r *ProductRepository) List(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int64, error) {
-	q := r.db.WithContext(ctx).Model(&productModel{})
-	if f.CategoryID != nil {
-		q = q.Where("category_id = ?", *f.CategoryID)
-	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("count products: %w", err)
-	}
-	if total == 0 {
-		return []domain.Product{}, 0, nil
-	}
-
-	var models []productModel
-	err := r.withCategory(q).
-		Order("created_at DESC, id DESC").
-		Limit(f.Limit).
-		Offset(f.Offset).
-		Find(&models).Error
-	if err != nil {
-		return nil, 0, fmt.Errorf("list products: %w", err)
-	}
-
-	products := make([]domain.Product, 0, len(models))
-	for i := range models {
-		products = append(products, productToDomain(&models[i]))
-	}
-	return products, total, nil
-}
-
 func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		category, err := lockActiveCategory(tx, p.CategoryID)
