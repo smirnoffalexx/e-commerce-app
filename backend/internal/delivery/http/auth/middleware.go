@@ -36,6 +36,21 @@ func Require(p domain.Permission) gin.HandlerFunc {
 	}
 }
 
+func RequireAny(perms ...domain.Permission) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		principal, ok := PrincipalFrom(c)
+		if ok {
+			for _, p := range perms {
+				if principal.Role.Can(p) {
+					c.Next()
+					return
+				}
+			}
+		}
+		response.Error(c, domain.ErrInsufficientPermissions)
+	}
+}
+
 func PrincipalFrom(c *gin.Context) (domain.Principal, bool) {
 	v, ok := c.Get(ctxKeyPrincipal)
 	if !ok {

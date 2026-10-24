@@ -39,6 +39,7 @@ type testAPI struct {
 	auth       *mocks.AuthService
 	admins     *mocks.AdminService
 	imports    *mocks.CatalogImportService
+	orders     *mocks.OrderService
 }
 
 type stubTokens struct{}
@@ -64,6 +65,7 @@ func newTestAPI(t *testing.T) *testAPI {
 	authSvc := mocks.NewAuthService(t)
 	adminSvc := mocks.NewAdminService(t)
 	importSvc := mocks.NewCatalogImportService(t)
+	orderSvc := mocks.NewOrderService(t)
 	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     slog.New(slog.DiscardHandler),
 		Health:     handler.NewHealthHandler(time.Second),
@@ -72,10 +74,11 @@ func newTestAPI(t *testing.T) *testAPI {
 		Auth:       handler.NewAuthHandler(authSvc),
 		Admins:     handler.NewAdminHandler(adminSvc),
 		Imports:    handler.NewCatalogImportHandler(importSvc),
+		Orders:     handler.NewOrderHandler(orderSvc),
 		Tokens:     stubTokens{},
 	})
 	require.NoError(t, err)
-	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc, imports: importSvc}
+	return &testAPI{router: router, products: products, categories: categories, auth: authSvc, admins: adminSvc, imports: importSvc, orders: orderSvc}
 }
 
 func (a *testAPI) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {

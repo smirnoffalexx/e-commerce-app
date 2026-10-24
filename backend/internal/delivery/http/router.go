@@ -28,6 +28,7 @@ type RouterDeps struct {
 	Auth           *handler.AuthHandler
 	Admins         *handler.AdminHandler
 	Imports        *handler.CatalogImportHandler
+	Orders         *handler.OrderHandler
 	Tokens         auth.TokenParser
 	Limiter        ratelimit.Limiter
 	TrustedProxies []string
@@ -95,6 +96,7 @@ func NewRouter(d RouterDeps) (*gin.Engine, error) {
 	d.Categories.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermCategoriesWrite))
 	d.Admins.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermAdminsManage))
 	d.Imports.Register(api, auth.Authenticate(d.Tokens), auth.Require(domain.PermProductsImport))
+	d.Orders.Register(api, auth.Authenticate(d.Tokens))
 
 	return r, nil
 }

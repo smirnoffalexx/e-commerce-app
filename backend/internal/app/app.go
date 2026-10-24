@@ -14,6 +14,7 @@ import (
 	"e-commerce-backend/internal/csvimport"
 	httpdelivery "e-commerce-backend/internal/delivery/http"
 	"e-commerce-backend/internal/delivery/http/handler"
+	"e-commerce-backend/internal/payment"
 	"e-commerce-backend/internal/repository/postgres"
 	"e-commerce-backend/internal/repository/redis"
 	"e-commerce-backend/internal/security"
@@ -77,6 +78,14 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return fmt.Errorf("seed demo catalog: %w", err)
 	}
 
+	orderService := usecase.NewOrderService(
+		postgres.NewTransactor(db),
+		postgres.NewOrderRepository(db),
+		users,
+		payment.NewFakeProvider(),
+		redis.NewCheckoutLocker(rdb),
+	)
+
 	router, err := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     log,
 		Production: cfg.IsProduction(),
@@ -89,6 +98,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		Auth:           handler.NewAuthHandler(authService),
 		Imports:        handler.NewCatalogImportHandler(importService),
 		Admins:         handler.NewAdminHandler(usecase.NewAdminService(users, hasher, security.NewTempPasswordGenerator(), refreshTokens)),
+		Orders:         handler.NewOrderHandler(orderService),
 		Tokens:         jwt,
 		Limiter:        redis.NewRateLimiter(rdb),
 		TrustedProxies: cfg.TrustedProxies,

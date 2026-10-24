@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 
 	"e-commerce-backend/internal/delivery/http/middleware"
 	"e-commerce-backend/internal/domain"
@@ -23,6 +24,15 @@ type FieldProblem struct {
 	Message string `json:"message" example:"price must not be negative"`
 }
 
+type ItemProblem struct {
+	ProductID         string           `json:"product_id" format:"uuid" example:"0192f6b8-3c5e-7a51-9d3f-2b1c4e5f6a7b"`
+	Code              string           `json:"code" example:"price_changed" enums:"product_unavailable,out_of_stock,insufficient_stock,price_changed"`
+	RequestedQuantity int              `json:"requested_quantity" example:"2"`
+	AvailableQuantity *int             `json:"available_quantity,omitempty" example:"1"`
+	ExpectedPrice     *decimal.Decimal `json:"expected_price,omitempty" swaggertype:"string" example:"89.99"`
+	CurrentPrice      *decimal.Decimal `json:"current_price,omitempty" swaggertype:"string" example:"94.99"`
+}
+
 type Problem struct {
 	Type      string         `json:"type" example:"about:blank"`
 	Title     string         `json:"title" example:"Validation failed"`
@@ -32,6 +42,8 @@ type Problem struct {
 	Instance  string         `json:"instance,omitempty" example:"/api/v1/products"`
 	RequestID string         `json:"request_id,omitempty" example:"0192f6b8-3c5e-7a51-9d3f-2b1c4e5f6a7b"`
 	Errors    []FieldProblem `json:"errors,omitempty"`
+	Items     []ItemProblem  `json:"items,omitempty"`
+	OrderID   string         `json:"order_id,omitempty" format:"uuid"`
 }
 
 func Error(c *gin.Context, err error) {
@@ -63,6 +75,7 @@ func toProblem(err error) Problem {
 		verr   *domain.ValidationError
 		reqErr *RequestError
 		derr   *domain.Error
+		cerr   *domain.CheckoutConflictError
 	)
 
 	switch {
@@ -81,6 +94,8 @@ func toProblem(err error) Problem {
 			Detail: reqErr.Detail,
 			Errors: fieldProblems(reqErr.Fields),
 		}
+	case errors.As(err, &cerr):
+		return Problem{Status: http.StatusConflict, Code: cerr.Code(), Detail: cerr.Error(), Items: itemProblems(cerr.Issues)}
 	case errors.As(err, &derr):
 		return Problem{Status: statusForKind(err), Code: derr.Code(), Detail: derr.Error()}
 	case errors.Is(err, context.DeadlineExceeded):
@@ -136,6 +151,25 @@ func fieldProblems(fields []domain.FieldError) []FieldProblem {
 	out := make([]FieldProblem, 0, len(fields))
 	for _, f := range fields {
 		out = append(out, FieldProblem{Field: f.Field, Code: f.Code, Message: f.Message})
+	}
+	return out
+}
+
+func itemProblems(issues []domain.CheckoutIssue) []ItemProblem {
+	out := make([]ItemProblem, 0, len(issues))
+	for _, issue := range issues {
+		p := ItemProblem{
+			ProductID:         issue.ProductID.String(),
+			Code:              string(issue.Code),
+			RequestedQuantity: issue.RequestedQuantity,
+		}
+		if issue.Code != domain.IssueProductUnavailable {
+			available := issue.AvailableQuantity
+			expected := issue.ExpectedPrice.Round(domain.PriceDecimals)
+			current := issue.CurrentPrice.Round(domain.PriceDecimals)
+			p.AvailableQuantity, p.ExpectedPrice, p.CurrentPrice = &available, &expected, &current
+		}
+		out = append(out, p)
 	}
 	return out
 }

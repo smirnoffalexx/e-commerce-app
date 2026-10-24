@@ -62,7 +62,7 @@ func runTests(m *testing.M) int {
 
 func resetDB(t *testing.T) {
 	t.Helper()
-	if err := testDB.Exec("TRUNCATE products, categories CASCADE").Error; err != nil {
+	if err := testDB.Exec("TRUNCATE orders, products, categories, users CASCADE").Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }

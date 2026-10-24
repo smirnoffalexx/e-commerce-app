@@ -4,7 +4,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 
 | Part | Stack | Status |
 |---|---|---|
-| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting are done. Orders and fake payment, tracing, Dockerfile and CI are next. |
+| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Tracing, Dockerfile and CI are next. |
 | Frontend | React, Next.js | Not started yet |
 
 The rest of this document describes the backend. Frontend sections will be added when it is built.
@@ -145,6 +145,8 @@ Full contract: Swagger UI at `/swagger/index.html`.
 | Auth | `POST /api/v1/auth/register`, `login`, `refresh`, `logout` | public |
 | | `GET /api/v1/auth/me`, `POST /api/v1/auth/change-password` | any signed-in user, also with a temporary password |
 | Admins | `GET/POST /api/v1/admins`, `POST /{id}/reset-password`, `/deactivate`, `/activate` | SUPERADMIN |
+| Orders | `POST /api/v1/orders` (header `Idempotency-Key`) | USER |
+| | `GET /api/v1/orders`, `GET /api/v1/orders/{id}` | USER (own orders), ADMIN and SUPERADMIN (all, filter by `user_id`, `status`) |
 | Health | `GET /healthz`, `GET /readyz` | public |
 
 ### Error handling
@@ -171,13 +173,14 @@ Every error is `application/problem+json` (RFC 9457) with a stable machine-reada
 |---|---|
 | Malformed JSON, empty body, unknown field, wrong type, two JSON values, invalid UUID or query parameter | 400 |
 | Missing or invalid token | 401 |
+| Payment declined or failed (`order_id` points to the `FAILED` order) | 402 |
 | Not allowed, or temporary password must be changed first | 403 |
 | Not found (also unknown route) | 404 |
 | Wrong method | 405 |
-| SKU taken, category exists or in use, version conflict | 409 |
+| SKU taken, category exists or in use, version conflict, cart prices or stock changed, checkout with this key still running | 409 |
 | Body too large (JSON 1 MB, CSV 5 MB) | 413 |
 | Wrong `Content-Type` | 415 |
-| Business validation failed (all fields reported at once) | 422 |
+| Business validation failed (all fields reported at once), `Idempotency-Key` reused with a different body | 422 |
 | Rate limited (`Retry-After` set) | 429 |
 | Unexpected failure | 500, generic text only; details go to the log with the `request_id` |
 
@@ -225,9 +228,56 @@ Admin management only touches accounts with role `ADMIN`; targeting a `USER` or 
 
 ### Deleting and concurrent edits
 
-- Products and categories are **soft-deleted**. Uniqueness of SKU and category slug is enforced by partial indexes `WHERE deleted_at IS NULL`, so a SKU can be reused after deletion. Orders will store a snapshot of name, SKU and price, so history is not affected by later edits.
+- Products and categories are **soft-deleted**. Uniqueness of SKU and category slug is enforced by partial indexes `WHERE deleted_at IS NULL`, so a SKU can be reused after deletion. Order items store a snapshot of name, SKU and price, so history is not affected by later edits.
 - A category with active products cannot be deleted (`409 category_in_use`). The race "delete a category while a product is being created in it" is closed with row locks: deletion takes `FOR UPDATE` on the category, product create/update takes `FOR SHARE`. A foreign key alone does not help because a soft-deleted category still exists physically. An integration test runs 30 such races and checks that no active product ends up in a deleted category.
 - Product updates use **optimistic locking**: `PUT` must carry the `version` the client last saw; `UPDATE ... WHERE id = ? AND version = ?` affects zero rows if someone else saved first, and the client gets `409 version_conflict` instead of silently overwriting. Tested with 10 concurrent writers: exactly one wins.
+
+### Checkout and payment
+
+`POST /api/v1/orders` with the cart, the unit prices the customer saw, and a card. Only `USER` accounts buy; staff accounts get 403.
+
+```json
+{
+  "items": [{ "product_id": "0192f6b8-...", "quantity": 2, "unit_price": "89.99" }],
+  "payment": { "card_number": "4242 4242 4242 4242", "exp_month": 12, "exp_year": 2030, "cvc": "123" }
+}
+```
+
+Flow:
+1. **Validate** everything at once: 1 to 50 lines, quantity 1 to 100, each product once, prices with at most 2 decimals, card number (12 to 19 digits, Luhn), expiry not in the past, CVC 3 or 4 digits.
+2. **Reserve** in one transaction: lock the product rows `FOR UPDATE` **in id order** (two carts with the same products in a different order cannot deadlock), compare stock and prices, decrement with `UPDATE ... SET stock = stock - n WHERE stock >= n` (a second guard on top of the lock), insert the order as `PENDING` with item snapshots. Decrementing stock also bumps the product `version`, so an admin edit based on the old stock fails with `409 version_conflict` instead of overwriting a purchase.
+3. **Charge** the payment provider **outside** the transaction, so row locks are never held during a network call; 10 second timeout. The order id is the provider idempotency key. If the client disconnects after the reservation the payment still runs to the end (`context.WithoutCancel`).
+4. **Finalize** in a second transaction: `PAID` with the payment id, or `FAILED` with a reason and the stock returned. The status update is guarded with `WHERE status = 'PENDING'`.
+
+Prices: the client sends the price it showed; if any differs, nothing is reserved or charged and the response is `409 price_changed` with the current price per item. Missing, deleted, sold out (`stock = 0`) or short items give `409 items_unavailable`. All problems are reported in one response in `items`:
+
+```json
+{ "status": 409, "code": "price_changed",
+  "items": [{ "product_id": "0192f6b8-...", "code": "price_changed", "requested_quantity": 2,
+              "available_quantity": 5, "expected_price": "89.99", "current_price": "94.50" }] }
+```
+
+Idempotency (`Idempotency-Key` header, required):
+- The key is unique per user in the database (`UNIQUE (user_id, idempotency_key)`), together with a SHA-256 fingerprint of the request (lines, quantities, prices, card last 4 digits).
+- Same key and same body: the stored result is returned with `Idempotent-Replayed: true`, nothing is charged again. Same key, different body: `422 idempotency_key_reused`. First request still running: `409 checkout_in_progress`.
+- A Redis lock (`SET NX` with a 30 second TTL, released by a Lua compare-and-delete so an expired holder cannot release someone else's lock) answers concurrent duplicates fast. If Redis is down checkout keeps working: the unique index is the real guarantee, a racing duplicate rolls back its reservation and gets the stored result.
+- A failed payment is final for its key; retry with a new key.
+
+Fake provider (`internal/payment`), deterministic by card number, behind the `PaymentProvider` interface:
+
+| Card | Result |
+|---|---|
+| `4242 4242 4242 4242` (and any other valid number) | approved |
+| ends with `0002` | `402 card_declined` |
+| ends with `9995` | `402 insufficient_funds` |
+| ends with `0119` | `402 payment_timeout` |
+
+Card data is never stored or logged: the order keeps only the last 4 digits.
+
+Alternatives considered:
+- Charging inside the reservation transaction: simpler, but holds row locks for the whole provider call and blocks every buyer of the same products.
+- Optimistic stock check (`version`) instead of row locks: under a sale on one hot product most buyers would retry; a short `FOR UPDATE` serializes them cheaply.
+- Silently charging the new price: the customer must confirm any change, so the API refuses and returns the new prices.
 
 ### Search
 
@@ -302,11 +352,14 @@ The focus is business rules and the unusual cases, not line coverage:
 - **HTTP**: through the full router — every kind of bad request gets its own 4xx and never calls the service, internal error text never leaks, authentication and permissions for every write endpoint, upload limits.
 - **Security**: forged, expired, `alg: none` and tampered JWTs; temporary password alphabet and uniqueness.
 - **Rate limiter**: the Lua script on miniredis, including 50 concurrent requests against a limit of 10 (exactly 10 pass).
-- **Integration** (real PostgreSQL 18): repositories, soft delete and SKU reuse, database constraints, 10 concurrent updates with the same version, 30 races between category delete and product create, search ranking, typos, operators and pagination stability.
+- **Checkout**: cart limits, duplicates and card rules; price and stock conflicts stop before any payment; every payment outcome (approved, declined, insufficient funds, timeout, provider error) and stock release on failure; payment survives a disconnected client; idempotent replay, reused key, request in progress, Redis outage falling back to the unique index; customers never see other customers' orders.
+- **Integration** (real PostgreSQL 18): repositories, soft delete and SKU reuse, database constraints, 10 concurrent updates with the same version, 30 races between category delete and product create, search ranking, typos, operators and pagination stability; checkout end to end with the fake provider, and **20 buyers racing for the last item: exactly one order is paid, stock ends at 0**.
 
 ## Known limitations and next steps
 
-- Orders and fake payment, OpenTelemetry tracing, backend Dockerfile, GitHub Actions CI (in progress).
+- OpenTelemetry tracing, backend Dockerfile, GitHub Actions CI (in progress).
+- A crash between reservation and payment leaves a `PENDING` order holding stock. A background job should expire old `PENDING` orders (there is a partial index for it) after checking the provider with the order id. With a real provider a timeout is ambiguous (the charge may have gone through), so the order would stay `PENDING` until reconciliation instead of failing immediately; the fake provider guarantees that a timeout charged nothing.
+- One currency; no taxes, discounts or shipping in the total.
 - Cart lives in the browser (`localStorage`); prices and stock are re-checked at checkout. If carts must follow the user across devices, move them to the database.
 - Order cancellation and refunds (return stock as a compensating action).
 - Shipping cost by `weight_kg` (the weight is stored and returned, but not used yet).

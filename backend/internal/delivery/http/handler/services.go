@@ -46,7 +46,14 @@ type CatalogImportService interface {
 	Import(ctx context.Context, r io.Reader, opts usecase.ImportOptions) (usecase.ImportReport, error)
 }
 
+type OrderService interface {
+	Checkout(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (usecase.CheckoutResult, error)
+	Get(ctx context.Context, viewer domain.Principal, id uuid.UUID) (domain.Order, error)
+	List(ctx context.Context, viewer domain.Principal, q usecase.ListOrdersQuery) (usecase.Page[domain.Order], error)
+}
+
 var (
+	_ OrderService         = (*usecase.OrderService)(nil)
 	_ CatalogImportService = (*usecase.CatalogImportService)(nil)
 	_ AdminService         = (*usecase.AdminService)(nil)
 	_ ProductService       = (*usecase.ProductService)(nil)

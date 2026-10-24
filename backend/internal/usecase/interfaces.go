@@ -58,6 +58,27 @@ type Transactor interface {
 	WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
+type OrderRepository interface {
+	LockProducts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Product, error)
+	ReserveStock(ctx context.Context, items []domain.OrderItem) error
+	ReleaseStock(ctx context.Context, items []domain.OrderItem) error
+	Create(ctx context.Context, o *domain.Order) error
+	GetByID(ctx context.Context, id uuid.UUID) (domain.Order, error)
+	GetByIdempotencyKey(ctx context.Context, userID uuid.UUID, key string) (domain.Order, error)
+	LockByID(ctx context.Context, id uuid.UUID) (domain.Order, error)
+	UpdateStatus(ctx context.Context, o *domain.Order) error
+	List(ctx context.Context, f domain.OrderFilter) ([]domain.Order, int64, error)
+}
+
+type PaymentProvider interface {
+	Charge(ctx context.Context, req PaymentRequest) (PaymentResult, error)
+}
+
+type CheckoutLocker interface {
+	Acquire(ctx context.Context, key string, ttl time.Duration) (token string, acquired bool, err error)
+	Release(ctx context.Context, key, token string) error
+}
+
 type CatalogImportRepository interface {
 	LockCatalogImport(ctx context.Context) error
 	CategoriesBySlugs(ctx context.Context, slugs []string) (map[string]domain.Category, error)
