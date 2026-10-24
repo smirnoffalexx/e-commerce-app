@@ -13,22 +13,51 @@ import (
 	"e-commerce-backend/config"
 	httpdelivery "e-commerce-backend/internal/delivery/http"
 	"e-commerce-backend/internal/delivery/http/handler"
+	"e-commerce-backend/internal/repository/postgres"
+	"e-commerce-backend/internal/repository/redis"
 )
 
 const (
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 15 * time.Second
 	readinessTimeout  = 2 * time.Second
+	connectTimeout    = 10 * time.Second
 )
 
 func Run(ctx context.Context, cfg config.Config) error {
 	log := newLogger(cfg)
 	slog.SetDefault(log)
 
+	connectCtx, cancelConnect := context.WithTimeout(ctx, connectTimeout)
+	defer cancelConnect()
+
+	db, err := postgres.NewDB(connectCtx, cfg.Postgres.DSN(), log)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := postgres.Close(db); err != nil {
+			log.Error("close postgres", slog.Any("error", err))
+		}
+	}()
+
+	rdb, err := redis.NewClient(connectCtx, cfg.Redis)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := rdb.Close(); err != nil {
+			log.Error("close redis", slog.Any("error", err))
+		}
+	}()
+
 	router := httpdelivery.NewRouter(httpdelivery.RouterDeps{
 		Logger:     log,
 		Production: cfg.IsProduction(),
-		Health:     handler.NewHealthHandler(readinessTimeout),
+		Health: handler.NewHealthHandler(readinessTimeout,
+			postgres.NewHealthChecker(db),
+			redis.NewHealthChecker(rdb),
+		),
 	})
 
 	srv := &http.Server{

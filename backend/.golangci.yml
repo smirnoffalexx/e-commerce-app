@@ -39,6 +39,8 @@ linters:
       enabled-tags:
         - diagnostic
         - performance
+      disabled-checks:
+        - hugeParam
   exclusions:
     generated: lax
     paths:
@@ -56,4 +58,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - ecommerce-backend
+        - e-commerce-backend

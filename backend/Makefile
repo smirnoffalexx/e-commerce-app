@@ -1,7 +1,19 @@
 GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := $(CURDIR)/bin/golangci-lint
 
-.PHONY: run build test lint lint-fix tools
+COMPOSE := docker compose -f ../docker-compose.yml
+
+.PHONY: run build test lint lint-fix tools infra-up infra-down migrate-up
+
+infra-up:
+	$(COMPOSE) up -d --wait postgres redis
+	$(COMPOSE) run --rm migrate
+
+infra-down:
+	$(COMPOSE) down
+
+migrate-up:
+	$(COMPOSE) run --rm migrate
 
 run:
 	go run ./cmd/api
