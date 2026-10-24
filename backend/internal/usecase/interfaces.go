@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -23,4 +24,27 @@ type ProductRepository interface {
 	List(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int64, error)
 	Update(ctx context.Context, p *domain.Product) error
 	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type UserRepository interface {
+	Create(ctx context.Context, u *domain.User) error
+	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
+	GetByEmail(ctx context.Context, email string) (domain.User, error)
+	Update(ctx context.Context, u *domain.User) error
+}
+
+type PasswordHasher interface {
+	Hash(password string) (string, error)
+	Compare(hash, password string) bool
+}
+
+type AccessTokenIssuer interface {
+	Issue(u *domain.User) (token string, expiresAt time.Time, err error)
+}
+
+type RefreshTokenStore interface {
+	Issue(ctx context.Context, userID uuid.UUID, ttl time.Duration) (string, error)
+	Consume(ctx context.Context, token string) (uuid.UUID, error)
+	Revoke(ctx context.Context, token string) error
+	RevokeAll(ctx context.Context, userID uuid.UUID) error
 }
