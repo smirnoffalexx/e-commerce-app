@@ -46,6 +46,48 @@ services:
         condition: service_healthy
     restart: "no"
 
+  backend:
+    build:
+      context: ./backend
+    image: e-commerce-backend:local
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HTTP_PORT: "8080"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-ecommerce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecommerce}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: ${JWT_SECRET:-}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      SEED_DEMO_FILE: /data/example_data.csv
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+    ports:
+      - "${API_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./example_data.csv:/data/example_data.csv:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 20s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

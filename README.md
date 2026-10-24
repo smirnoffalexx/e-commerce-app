@@ -4,7 +4,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 
 | Part | Stack | Status |
 |---|---|---|
-| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Tracing, Dockerfile and CI are next. |
+| Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile and compose service are done; CI is next, tracing is planned. |
 | Frontend | React, Next.js | Not started yet |
 
 The rest of this document describes the backend. Frontend sections will be added when it is built.
@@ -39,6 +39,27 @@ Importing the file produces: 95 data rows, 2 blank rows, **85 products created**
 
 ## Running locally
 
+### Everything in Docker
+
+Requirements: Docker with Compose.
+
+```bash
+cp example.env .env
+docker compose up -d --build --wait
+```
+
+This builds the backend image, starts PostgreSQL and Redis, applies migrations, then starts the API once the database is migrated; `--wait` returns when every service is healthy. The demo catalog from `example_data.csv` is imported on the first start (the file is mounted read-only). Stop with `docker compose down` (add `-v` to wipe the data). The API listens on the same port as `make run`, so run only one of them.
+
+The image (`backend/Dockerfile`):
+- Multi-stage: `golang:1.27.3-alpine` runs `make swagger` (the spec is generated, never committed) and builds a static binary with `CGO_ENABLED=0 -trimpath`; Go module and build caches are BuildKit cache mounts.
+- Runtime is `alpine` with an unprivileged user `app` (uid 10001), about 50 MB. In compose the container also runs with a read-only root filesystem and `no-new-privileges`.
+- Healthcheck: BusyBox `wget` calls `/readyz` (PostgreSQL and Redis reachable); a 503 makes it fail. It is used both by the image `HEALTHCHECK` and by compose.
+- Alternative considered: `distroless/static` (no shell, about 5 MB smaller). It has no `wget` or `curl`, so the healthcheck would need extra Go code (a `healthcheck` subcommand or a separate binary) only for Docker; Alpine keeps the application code free of it.
+- Graceful shutdown: compose waits 20 s (`stop_grace_period`), longer than the server's 15 s shutdown timeout, so in-flight requests, including a checkout waiting for payment, finish.
+- In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode).
+
+### Go on the host
+
 Requirements: Go 1.27.3 (with `GOTOOLCHAIN=auto` an older Go downloads it automatically), Docker with Compose, `make`.
 
 ```bash
@@ -66,7 +87,7 @@ Reset the local database: `docker compose down -v`, then `make infra-up`.
 |---|---|---|
 | PostgreSQL | **5433** | 5432 is very likely taken by a locally installed PostgreSQL |
 | Redis | **6380** | 6379 is very likely taken by a locally installed Redis |
-| API | 8080 | |
+| API | 8080 | `API_HOST_PORT` for the Docker container |
 
 The host ports can be changed with `POSTGRES_HOST_PORT` and `REDIS_HOST_PORT` in `.env`.
 
@@ -357,7 +378,15 @@ The focus is business rules and the unusual cases, not line coverage:
 
 ## Known limitations and next steps
 
-- OpenTelemetry tracing, backend Dockerfile, GitHub Actions CI (in progress).
+- GitHub Actions CI (in progress).
+- **OpenTelemetry tracing** (planned, not implemented):
+  - `internal/telemetry` with the OTel SDK, OTLP exporter and W3C `traceparent` propagation, so traces continue through the Next.js BFF. Configured only with the standard `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_TRACES_SAMPLER` (`parentbased_traceidratio` in production); with no endpoint a no-op provider is used, so tests and local runs pay nothing. The provider is flushed on graceful shutdown.
+  - Automatic spans: Gin (span named by route template such as `GET /api/v1/orders/:id`, not the raw path; health and swagger routes skipped; error status only for 5xx), GORM (parameterized SQL only, never values), go-redis (rate limit, refresh tokens, checkout lock).
+  - Manual spans where automatic ones explain nothing: checkout as `reserve` → `payment.charge` → `finalize` with order id, amount, line count, outcome, failure code and replay flag (never card data); search stage (full-text or trigram fallback) and hit count; CSV import mode, dry run and row counts.
+  - `trace_id` / `span_id` added to access and error logs by a slog handler wrapper, so a `request_id` from a problem response leads to the log line and from there to the trace.
+  - Jaeger all-in-one behind `docker compose --profile tracing`, UI on port 16686.
+  - Tests with an in-memory span recorder: checkout span tree and attributes, no card data in spans, route-template span names, 4xx not marked as errors.
+  - Later: RED metrics for HTTP, checkout duration and payment outcome counters (OTel metrics or Prometheus).
 - A crash between reservation and payment leaves a `PENDING` order holding stock. A background job should expire old `PENDING` orders (there is a partial index for it) after checking the provider with the order id. With a real provider a timeout is ambiguous (the charge may have gone through), so the order would stay `PENDING` until reconciliation instead of failing immediately; the fake provider guarantees that a timeout charged nothing.
 - One currency; no taxes, discounts or shipping in the total.
 - Cart lives in the browser (`localStorage`); prices and stock are re-checked at checkout. If carts must follow the user across devices, move them to the database.

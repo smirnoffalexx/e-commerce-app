@@ -1,0 +1,6 @@
+bin/
+docs/
+coverage.out
+coverage.html
+Dockerfile
+.dockerignore
