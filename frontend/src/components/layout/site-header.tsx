@@ -1,6 +1,8 @@
 import { StoreIcon } from "lucide-react";
 import Link from "next/link";
+import { canPurchase } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/server/api";
+import { CartButton } from "@/components/cart/cart-button";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
@@ -18,6 +20,7 @@ export async function SiteHeader() {
         </Link>
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
+          {canPurchase(user) && <CartButton />}
           {user ? (
             <UserMenu user={user} />
           ) : (

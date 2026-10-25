@@ -4,6 +4,7 @@ import { KeyRoundIcon, LogOutIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { clearCart } from "@/hooks/use-cart";
 import { authApi } from "@/lib/api/auth";
 import { errorMessage } from "@/lib/api/problem";
 import type { User } from "@/lib/api/types";
@@ -26,6 +27,7 @@ export function UserMenu({ user }: { user: User }) {
   async function signOut() {
     try {
       await authApi.logout();
+      clearCart();
       router.replace("/");
       router.refresh();
     } catch (error) {

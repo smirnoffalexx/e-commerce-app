@@ -5,7 +5,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 | Part | Stack | Status |
 |---|---|---|
 | Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
-| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account and password change are done. Catalog, cart, checkout, order history and admin screens are in progress. |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page and cart are done. Checkout, order history and admin screens are in progress. |
 
 Most of this document describes the backend; see [Frontend](#frontend) for the web app.
 
@@ -407,6 +407,8 @@ frontend/
   src/app/**/page.tsx     server components; read data with serverApi() directly from the backend
   src/lib/api             types from the API responses, browser client, RFC 9457 error mapping
   src/lib/session         cookie policy, refresh coordinator, origin check, route rules (pure, unit-tested)
+  src/lib/catalog         URL query parsing and links for the catalog
+  src/lib/cart            cart rules, localStorage parsing, revalidation against current products
   src/lib/server          server-only helpers: backend calls, current user, BFF responses
   src/components/ui       shadcn/ui components (Radix primitives + Tailwind)
 ```
@@ -439,15 +441,26 @@ Next.js sets `X-Forwarded-For` only when the request does not already have one, 
 |---|---|---|
 | Sign in, create account | `/login`, `/register` | Done |
 | Account, change password (also forced for temporary admin passwords) | `/account`, `/account/password` | Done |
-| Catalog with search and filters, product page | `/`, `/products/[id]` | Next step |
-| Cart and checkout | `/cart`, `/checkout` | Planned |
+| Catalog with search, category, price range, in-stock filter, sorting and pagination | `/` | Done |
+| Product page with quantity, stock state and more products from the category | `/products/[id]` | Done |
+| Cart | `/cart` | Done |
+| Checkout | `/checkout` | Next step |
 | Order history | `/orders` | Planned |
 | Admin: products, categories, CSV import with dry-run preview, all orders | `/admin/*` | Planned |
 | Superadmin: administrators | `/admin/admins` | Planned |
 
+### Catalog and cart
+
+- The catalog state lives in the URL (`/?q=lamp&category_id=…&in_stock=true&sort=price_asc&page=2`), so a search can be shared, bookmarked and restored with Back. The page is a server component; filters are client components that replace the URL, and the previous results stay visible (dimmed) until the new ones arrive. The search box waits 350 ms after typing; price limits apply on blur or Enter and are validated first (format, minimum not above maximum). Parameters from the URL are sanitised before they reach the backend, so a hand-edited link shows the catalog instead of an error.
+- There are no product images in the data, so every card shows a category icon on a gradient derived from the category slug.
+- The cart is kept in `localStorage` and shared by tabs (the `storage` event). Each line stores the price the buyer saw, because checkout sends it as `unit_price` and the backend rejects the order with `409 price_changed` if it differs. The cart enforces the backend limits up front: at most 50 lines, 1 to 100 items per line, never more than the known stock. Stored data is validated on read, so a corrupted or edited value cannot break the page.
+- Opening the cart re-reads every product: changed prices are adopted, quantities are reduced to the available stock, sold-out and deleted products are removed, and the buyer sees a list of what changed. The stock can still change before payment, so checkout handles `409` again.
+- Money is calculated in integer cents (`"0.10" * 3` is exactly `"0.30"`); amounts stay strings everywhere else, as in the API.
+- Staff accounts cannot buy: the cart icon is hidden, add-to-cart buttons are disabled with an explanation and `/cart` redirects to the catalog. The cart is cleared on sign-out, so the next person on a shared computer does not inherit it.
+
 ### Frontend tests
 
-Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping and the password rules shared with the backend.
+Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping, the password rules shared with the backend, money arithmetic, cart limits and merging, cart revalidation, tolerant parsing of stored carts, catalog URL parsing and pagination.
 
 ## Testing
 
