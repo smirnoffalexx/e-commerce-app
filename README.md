@@ -5,9 +5,9 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 | Part | Stack | Status |
 |---|---|---|
 | Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
-| Frontend | React, Next.js | Not started yet |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account and password change are done. Catalog, cart, checkout, order history and admin screens are in progress. |
 
-The rest of this document describes the backend. Frontend sections will be added when it is built.
+Most of this document describes the backend; see [Frontend](#frontend) for the web app.
 
 ## Example CSV
 
@@ -360,6 +360,95 @@ Responses carry `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`; a b
 
 Limitation: the limit is per IP. A distributed attack on one account from many IPs needs an additional per-email limit inside login; that is a next step.
 
+## Frontend
+
+### Running the frontend
+
+Requirements: Node.js 22.12+ (`frontend/.nvmrc` pins 24) and npm 11 (npm 10 fails to install the dependency tree with `Cannot read properties of null (reading 'edgesOut')`). The backend must be running (see above).
+
+```bash
+cd frontend
+cp example.env .env.local
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. Sign in as the superadmin from `.env` or create a customer account.
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Development server with hot reload |
+| `npm run build`, `npm start` | Production build; `start` runs `server.mjs` (see Client IP) |
+| `npm run lint` | ESLint (`eslint-config-next`) |
+| `npm run typecheck` | Generates route types (`next typegen`) and runs `tsc` |
+| `npm test` | Vitest unit tests |
+
+| Variable | Default | Notes |
+|---|---|---|
+| `BACKEND_URL` | `http://localhost:8080` | Backend base URL, used only on the server |
+| `APP_ORIGIN` | the request origin | Comma-separated origins allowed to send mutating requests (CSRF check) |
+| `COOKIE_SECURE` | `true` in production | Set `false` to use the production build over plain HTTP on localhost |
+| `TRUST_PROXY` | `false` | `true` only when a reverse proxy in front of the frontend sets `X-Forwarded-For` |
+
+### Architecture
+
+The browser talks only to Next.js; Next.js is a backend-for-frontend (BFF) and the only client of the Go API. The backend has no CORS on purpose, and tokens never reach JavaScript.
+
+```
+browser ──cookies──▶ Next.js (proxy.ts → pages / route handlers) ──Bearer + X-Forwarded-For──▶ Go API
+```
+
+```
+frontend/
+  server.mjs              production entry: Next.js request handler + trusted client IP
+  src/proxy.ts            runs before every page and /api request: CSRF check, token refresh, auth redirects
+  src/app/api/auth/*      login, register, logout, change-password: exchange credentials for httpOnly cookies
+  src/app/api/[...path]   generic proxy to /api/v1/* with the access token from the cookie
+  src/app/**/page.tsx     server components; read data with serverApi() directly from the backend
+  src/lib/api             types from the API responses, browser client, RFC 9457 error mapping
+  src/lib/session         cookie policy, refresh coordinator, origin check, route rules (pure, unit-tested)
+  src/lib/server          server-only helpers: backend calls, current user, BFF responses
+  src/components/ui       shadcn/ui components (Radix primitives + Tailwind)
+```
+
+- **Reads** happen in server components (`serverApi`), so pages render with data and the token stays on the server. **Mutations** go from client components to `/api/*` route handlers.
+- **Types** are written by hand from the backend DTOs (`src/lib/api/types.ts`). The backend publishes Swagger 2.0, and OpenAPI generators for TypeScript expect OpenAPI 3; a conversion step is a next step if the API grows.
+- **UI**: shadcn/ui (components are copied into the repo, so they can be adjusted freely), lucide icons, sonner toasts, light and dark theme via `next-themes`. Forms validate with zod on the client using the same rules as the backend (password 10 characters to 72 bytes, not equal to the email), and server-side 422 errors are mapped back to the fields by `field`.
+- **Errors**: every non-2xx response is parsed as RFC 9457 into an `ApiError`; messages are chosen by the stable `code`, with the backend `detail` as a fallback.
+- **Cache Components** (enabled by default in the Next.js 16 template) are turned off: almost every page depends on the session cookie, so there is little to prerender, and per-user data must never be cached across users.
+
+### Session, refresh and CSRF
+
+- Login, register (register, then login with the same credentials) and change-password are handled by BFF route handlers that store the tokens in cookies and return only the user: `shop_access` (lives 30 s less than the 15-minute JWT), `shop_refresh` (until the refresh token expires, 7 days) and `shop_password_change` (set while an admin still has a temporary password). All are `HttpOnly`, `SameSite=Lax`, `Secure` in production, `Path=/`.
+- `proxy.ts` refreshes the session **before** the request reaches a page or route handler: when the access cookie has expired and a refresh cookie exists, it calls `/auth/refresh`, writes the new cookies to the response and to the current request, so server components already see the new token. Server components cannot set cookies, so refreshing there would lose the rotated token.
+- Refresh tokens rotate and a reused token is rejected, so parallel requests with the same expired session must not all refresh. The proxy keeps one in-flight refresh per token and reuses its result for 15 s, so requests that were already on the way with the old cookie get the same new session. If the backend is unreachable the result is not cached and the cookies are kept; a rejected token clears them.
+- `/api/auth/refresh` is not exposed through the generic proxy, so refresh tokens never leave the server.
+- A backend 401 on any proxied call clears the cookies. Protected pages (`/account`, `/orders`, `/checkout`, `/admin`) redirect guests to `/login?next=…`; `next` accepts only same-site relative paths. While `shop_password_change` is set every page redirects to `/account/password`, mirroring the backend's `403 password_change_required`.
+- CSRF: cookies are `SameSite=Lax`, so other sites cannot send them with `POST`/`PUT`/`DELETE`, and the proxy additionally rejects every mutating `/api/*` request whose `Origin` is not in `APP_ORIGIN` (or, without `Origin`, whose `Sec-Fetch-Site` is not `same-origin`) with `403 invalid_origin`. A separate CSRF token is not needed: `SameSite` keeps the cookies off cross-site requests, and the origin check rejects whatever a browser still sends (for example from a sibling subdomain, which counts as same-site).
+- Alternative considered: the access token in memory and the refresh token in a cookie (SPA pattern). It still needs a BFF-like refresh endpoint to keep the refresh token away from JavaScript, loses the session on reload until a refresh, and cannot render authenticated pages on the server.
+
+### Client IP
+
+The backend rate-limits by IP and trusts `X-Forwarded-For` only from `TRUSTED_PROXIES`. The BFF forwards `X-Forwarded-For`, so the frontend's address must be in `TRUSTED_PROXIES`; otherwise all users share one limit.
+
+Next.js sets `X-Forwarded-For` only when the request does not already have one, so a client could send its own header and get a fresh rate-limit bucket on every request. `npm start` therefore runs `server.mjs`, a thin wrapper around the Next.js request handler that replaces `X-Forwarded-For` with the socket address and drops other `X-Forwarded-*` headers. Behind a reverse proxy that sets the header itself, set `TRUST_PROXY=true`. `npm run dev` uses the plain Next.js dev server.
+
+### Screens
+
+| Screen | Path | Status |
+|---|---|---|
+| Sign in, create account | `/login`, `/register` | Done |
+| Account, change password (also forced for temporary admin passwords) | `/account`, `/account/password` | Done |
+| Catalog with search and filters, product page | `/`, `/products/[id]` | Next step |
+| Cart and checkout | `/cart`, `/checkout` | Planned |
+| Order history | `/orders` | Planned |
+| Admin: products, categories, CSV import with dry-run preview, all orders | `/admin/*` | Planned |
+| Superadmin: administrators | `/admin/admins` | Planned |
+
+### Frontend tests
+
+Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping and the password rules shared with the backend.
+
 ## Testing
 
 ```bash
@@ -401,5 +490,6 @@ CI uses the same `make` targets as a developer, so tool versions (golangci-lint,
 - Audit log of admin actions (who changed a role, who deleted a product).
 - Per-account login rate limit; instant access-token revocation.
 - Search cache in Redis (see Search).
+- The refresh coordinator in the BFF is in-memory, so it deduplicates refreshes only within one frontend instance; with several replicas use sticky sessions or a shared lock in Redis.
 - i18n: the UI and API messages are English only; error `code`s are stable and can be translated on the client.
 - Marketplace mode (see "Single store").
