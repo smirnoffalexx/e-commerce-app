@@ -48,7 +48,13 @@ cp example.env .env
 docker compose up -d --build --wait
 ```
 
-This builds the backend image, starts PostgreSQL and Redis, applies migrations, then starts the API once the database is migrated; `--wait` returns when every service is healthy. The demo catalog from `example_data.csv` is imported on the first start (the file is mounted read-only). Stop with `docker compose down` (add `-v` to wipe the data). The API listens on the same port as `make run`, so run only one of them.
+This builds the backend and frontend images, starts PostgreSQL and Redis, applies migrations, starts the API once the database is migrated, then the frontend and the Caddy reverse proxy in front of it; `--wait` returns when every service is healthy. Open **http://localhost:3000** for the store (sign in as the superadmin from `.env` for the admin area) and http://localhost:8080/swagger/index.html for the API. The demo catalog from `example_data.csv` is imported on the first start (the file is mounted read-only). Stop with `docker compose down` (add `-v` to wipe the data). The API listens on the same port as `make run`, so run only one of them.
+
+```
+browser ──:3000──▶ proxy (Caddy) ──▶ frontend (Next.js BFF, 172.31.250.10) ──▶ backend (Go API) ──▶ PostgreSQL, Redis
+```
+
+The compose network has a fixed subnet, `172.31.250.0/24`, so the frontend gets a fixed address that the backend trusts in `TRUSTED_PROXIES` (see [Client IP](#client-ip)). If the subnet clashes with another Docker network, change it together with the frontend address and `TRUSTED_PROXIES`. A stack started before the frontend was added has a network without this subnet; recreate it once with `docker compose down` (data volumes are kept).
 
 The image (`backend/Dockerfile`):
 - Multi-stage: `golang:1.27.3-alpine` runs `make swagger` (the spec is generated, never committed) and builds a static binary with `CGO_ENABLED=0 -trimpath`; Go module and build caches are BuildKit cache mounts.
@@ -57,6 +63,14 @@ The image (`backend/Dockerfile`):
 - Alternative considered: `distroless/static` (no shell, about 5 MB smaller). It has no `wget` or `curl`, so the healthcheck would need extra Go code (a `healthcheck` subcommand or a separate binary) only for Docker; Alpine keeps the application code free of it.
 - Graceful shutdown: compose waits 20 s (`stop_grace_period`), longer than the server's 15 s shutdown timeout, so in-flight requests, including a checkout waiting for payment, finish.
 - In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode).
+
+The frontend image (`frontend/Dockerfile`):
+- Multi-stage on `node:24.22.1-alpine`: `npm ci` with a BuildKit cache, `next build` with `output: "standalone"`, and a runtime stage with only the standalone server, its traced dependencies (`next`, `react`, `react-dom`) and static assets, about 225 MB, most of it the Node.js base image.
+- Runs the Next.js standalone `server.js` as the unprivileged user `app`; the application files belong to root and the root filesystem is read-only in compose, with a `tmpfs` for `.next/cache`.
+- Healthcheck: `wget` on `/healthz`, a route that answers without touching the backend; compose starts the frontend only after the backend is healthy, and the proxy only after the frontend is healthy.
+- Alternative considered: running `next start` with all production dependencies instead of the standalone output. It needs no tracing, but the image is several times larger.
+
+The proxy is the official `caddy:2.10.2-alpine` image with `caddy/Caddyfile`: it forwards everything to the frontend, compresses responses and sets `X-Forwarded-For` from the real client address. The admin API and automatic HTTPS are turned off for local use; in production this is where TLS would be terminated.
 
 ### Go on the host
 
@@ -88,6 +102,7 @@ Reset the local database: `docker compose down -v`, then `make infra-up`.
 | PostgreSQL | **5433** | 5432 is very likely taken by a locally installed PostgreSQL |
 | Redis | **6380** | 6379 is very likely taken by a locally installed Redis |
 | API | 8080 | `API_HOST_PORT` for the Docker container |
+| Store (Caddy in front of the frontend) | 3000 | `FRONTEND_HOST_PORT`; the frontend container itself is not published |
 
 The host ports can be changed with `POSTGRES_HOST_PORT` and `REDIS_HOST_PORT` in `.env`.
 
@@ -116,7 +131,8 @@ The host ports can be changed with `POSTGRES_HOST_PORT` and `REDIS_HOST_PORT` in
 | `JWT_SECRET` | **required**, at least 32 bytes | No default on purpose, so a weak secret can never reach production |
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | empty | Creates the first superadmin once; an existing account is never modified |
 | `SEED_DEMO_FILE` | empty | CSV imported on start if the catalog is empty |
-| `TRUSTED_PROXIES` | empty | Comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted. Must include the frontend BFF in Docker |
+| `TRUSTED_PROXIES` | empty; `172.31.250.10` in compose | Comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted: the frontend BFF |
+| `APP_ORIGIN`, `COOKIE_SECURE`, `FRONTEND_HOST_PORT` | `http://localhost:3000`, `false`, `3000` | Frontend settings used by compose, see [Running the frontend](#running-the-frontend) |
 
 ## Architecture
 
@@ -364,7 +380,7 @@ Limitation: the limit is per IP. A distributed attack on one account from many I
 
 ### Running the frontend
 
-Requirements: Node.js 22.12+ (`frontend/.nvmrc` pins 24) and npm 11 (npm 10 fails to install the dependency tree with `Cannot read properties of null (reading 'edgesOut')`). The backend must be running (see above).
+Requirements: Node.js 22.12+ (`frontend/.nvmrc` pins 24) and npm 11 (npm 10 fails to install the dependency tree with `Cannot read properties of null (reading 'edgesOut')`). The backend must be running (see above); stop the `frontend` and `proxy` containers first if the whole stack runs in Docker, since they use port 3000.
 
 ```bash
 cd frontend
@@ -378,7 +394,7 @@ Open http://localhost:3000. Sign in as the superadmin from `.env` or create a cu
 | Script | What it does |
 |---|---|
 | `npm run dev` | Development server with hot reload |
-| `npm run build`, `npm start` | Production build; `start` runs `server.mjs` (see Client IP) |
+| `npm run build`, `npm start` | Production build and server |
 | `npm run lint` | ESLint (`eslint-config-next`) |
 | `npm run typecheck` | Generates route types (`next typegen`) and runs `tsc` |
 | `npm test` | Vitest unit tests |
@@ -388,7 +404,6 @@ Open http://localhost:3000. Sign in as the superadmin from `.env` or create a cu
 | `BACKEND_URL` | `http://localhost:8080` | Backend base URL, used only on the server |
 | `APP_ORIGIN` | the request origin | Comma-separated origins allowed to send mutating requests (CSRF check) |
 | `COOKIE_SECURE` | `true` in production | Set `false` to use the production build over plain HTTP on localhost |
-| `TRUST_PROXY` | `false` | `true` only when a reverse proxy in front of the frontend sets `X-Forwarded-For` |
 
 ### Architecture
 
@@ -400,7 +415,6 @@ browser ──cookies──▶ Next.js (proxy.ts → pages / route handlers) ─
 
 ```
 frontend/
-  server.mjs              production entry: Next.js request handler + trusted client IP
   src/proxy.ts            runs before every page and /api request: CSRF check, token refresh, auth redirects
   src/app/api/auth/*      login, register, logout, change-password: exchange credentials for httpOnly cookies
   src/app/api/[...path]   generic proxy to /api/v1/* with the access token from the cookie
@@ -434,9 +448,13 @@ frontend/
 
 ### Client IP
 
-The backend rate-limits by IP and trusts `X-Forwarded-For` only from `TRUSTED_PROXIES`. The BFF forwards `X-Forwarded-For`, so the frontend's address must be in `TRUSTED_PROXIES`; otherwise all users share one limit.
+The backend rate-limits by IP and trusts `X-Forwarded-For` only from `TRUSTED_PROXIES`. The BFF calls the backend on behalf of the user and forwards `X-Forwarded-For`, so the frontend's address must be in `TRUSTED_PROXIES`; otherwise all users share one limit.
 
-Next.js sets `X-Forwarded-For` only when the request does not already have one, so a client could send its own header and get a fresh rate-limit bucket on every request. `npm start` therefore runs `server.mjs`, a thin wrapper around the Next.js request handler that replaces `X-Forwarded-For` with the socket address and drops other `X-Forwarded-*` headers. Behind a reverse proxy that sets the header itself, set `TRUST_PROXY=true`. `npm run dev` uses the plain Next.js dev server.
+Next.js copies `X-Forwarded-For` from the incoming request and adds the socket address only when the header is missing, so a client talking to Next.js directly could send its own header and get a fresh rate-limit bucket on every request. Next.js expects a reverse proxy in front of it, and the compose stack has one: Caddy ignores `X-Forwarded-*` from clients, sets `X-Forwarded-For` to the real address, and is the only way in, because the frontend port is not published. The chain is `client → Caddy (sets the header) → Next.js (keeps it) → backend (trusts it from 172.31.250.10)`. Checked by sending `X-Forwarded-For: 1.2.3.4` to port 3000: the backend logs the real client address.
+
+`npm run dev` and `npm start` on the host have no proxy in front, which is fine for development.
+
+- Alternative tried: a small custom Node.js server around Next.js that overwrites the header with the socket address. It works with `next start`, but Next.js does not support a custom server with the standalone output (it then needs private environment variables to start), so the proxy is the cleaner choice and also gives a place for TLS.
 
 ### Screens
 
@@ -507,7 +525,11 @@ The focus is business rules and the unusual cases, not line coverage:
 
 ## CI
 
-GitHub Actions, `.github/workflows/backend.yml`. Runs on pushes to `master` and on pull requests that touch `backend/`, `docker-compose.yml`, `example_data.csv` or the workflow itself; parallel runs of the same pull request are cancelled. Three jobs run one after another (`needs`), so a lint or build error stops the pipeline before the slower tests:
+GitHub Actions, one workflow per part, each triggered only by changes in its own folder.
+
+### Backend
+
+`.github/workflows/backend.yml`. Runs on pushes to `master` and on pull requests that touch `backend/`, `docker-compose.yml`, `example_data.csv` or the workflow itself; parallel runs of the same pull request are cancelled. Three jobs run one after another (`needs`), so a lint or build error stops the pipeline before the slower tests:
 
 | Job | Steps |
 |---|---|
@@ -516,6 +538,17 @@ GitHub Actions, `.github/workflows/backend.yml`. Runs on pushes to `master` and 
 | **Integration tests** | `make swagger`, `make test-integration` (PostgreSQL 18 in testcontainers, Docker is available on the runner) |
 
 CI uses the same `make` targets as a developer, so tool versions (golangci-lint, mockery, swag) are pinned in one place, the Makefile; the installed tools are cached by its hash. Go comes from `go.mod` and `GOTOOLCHAIN=local` forbids silently downloading another version. The workflow has read-only permissions and pushes no images; publishing to a registry is a next step together with deployment.
+
+### Frontend
+
+`.github/workflows/frontend.yml`, the same structure: runs on pushes to `master` and pull requests that touch `frontend/` or the workflow; Node.js comes from `frontend/.nvmrc` and the npm cache is keyed by `package-lock.json`.
+
+| Job | Steps |
+|---|---|
+| **build** | `npm ci`, `npm run lint`, `npm run typecheck`, `npm run build` |
+| **Unit tests** | `npm ci`, `npm test` |
+
+Neither workflow builds Docker images; that would come with a registry and deployment.
 
 ## Known limitations and next steps
 
