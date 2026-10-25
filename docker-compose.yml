@@ -64,7 +64,7 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       SEED_DEMO_FILE: /data/example_data.csv
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.31.250.10}
     ports:
       - "${API_HOST_PORT:-8080}:8080"
     volumes:
@@ -87,6 +87,62 @@ services:
       start_period: 20s
     stop_grace_period: 20s
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: e-commerce-frontend:local
+    environment:
+      BACKEND_URL: http://backend:8080
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    networks:
+      default:
+        ipv4_address: 172.31.250.10
+    read_only: true
+    tmpfs:
+      - /app/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.10.2-alpine
+    ports:
+      - "${FRONTEND_HOST_PORT:-3000}:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    read_only: true
+    tmpfs:
+      - /data
+      - /config
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
 
 volumes:
   postgres-data:
