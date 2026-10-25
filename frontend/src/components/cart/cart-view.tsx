@@ -2,10 +2,9 @@
 
 import { ShoppingBagIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useCart, useCartHydrated } from "@/hooks/use-cart";
-import { itemCount, lineTotal, maxQuantity, reconcile, subtotal, type CartChange } from "@/lib/cart/cart";
-import { fetchCurrentProducts } from "@/lib/cart/revalidate";
+import { useCartRevalidation } from "@/hooks/use-cart-revalidation";
+import { itemCount, lineTotal, maxQuantity, subtotal } from "@/lib/cart/cart";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,45 +12,14 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProductArt } from "@/components/catalog/product-art";
 import { CartChanges } from "./cart-changes";
 import { QuantityStepper } from "./quantity-stepper";
 
 export function CartView() {
-  const { lines, update, remove, replace, snapshot } = useCart();
+  const { lines, update, remove } = useCart();
   const hydrated = useCartHydrated();
-  const [changes, setChanges] = useState<CartChange[]>([]);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-    const ids = snapshot().map((line) => line.productId);
-    if (ids.length === 0) {
-      return;
-    }
-    let cancelled = false;
-    fetchCurrentProducts(ids)
-      .then((fresh) => {
-        if (cancelled) {
-          return;
-        }
-        const result = reconcile(snapshot(), fresh);
-        replace(result.lines);
-        setChanges(result.changes);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          setChecking(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hydrated, snapshot, replace]);
+  const { changes, checking } = useCartRevalidation();
 
   if (!hydrated) {
     return <Skeleton className="h-64 w-full rounded-xl" />;
@@ -139,17 +107,16 @@ export function CartView() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="w-full" tabIndex={0}>
-                  <Button size="lg" className="w-full" disabled>
-                    {checking && <Spinner />}
-                    Checkout
-                  </Button>
+            <Button size="lg" className="w-full" disabled={checking} asChild={!checking}>
+              {checking ? (
+                <span>
+                  <Spinner />
+                  Checking prices
                 </span>
-              </TooltipTrigger>
-              <TooltipContent>Checkout is not available yet</TooltipContent>
-            </Tooltip>
+              ) : (
+                <Link href="/checkout">Checkout</Link>
+              )}
+            </Button>
             <p className="text-center text-xs text-muted-foreground">Prices and stock are checked again when you pay.</p>
           </CardFooter>
         </Card>

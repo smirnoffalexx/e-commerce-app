@@ -5,7 +5,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 | Part | Stack | Status |
 |---|---|---|
 | Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
-| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page and cart are done. Checkout, order history and admin screens are in progress. |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page, cart, checkout and order history are done. Admin screens are in progress. |
 
 Most of this document describes the backend; see [Frontend](#frontend) for the web app.
 
@@ -409,6 +409,7 @@ frontend/
   src/lib/session         cookie policy, refresh coordinator, origin check, route rules (pure, unit-tested)
   src/lib/catalog         URL query parsing and links for the catalog
   src/lib/cart            cart rules, localStorage parsing, revalidation against current products
+  src/lib/checkout        card validation, idempotency attempts, applying 409 details to the cart
   src/lib/server          server-only helpers: backend calls, current user, BFF responses
   src/components/ui       shadcn/ui components (Radix primitives + Tailwind)
 ```
@@ -444,9 +445,9 @@ Next.js sets `X-Forwarded-For` only when the request does not already have one, 
 | Catalog with search, category, price range, in-stock filter, sorting and pagination | `/` | Done |
 | Product page with quantity, stock state and more products from the category | `/products/[id]` | Done |
 | Cart | `/cart` | Done |
-| Checkout | `/checkout` | Next step |
-| Order history | `/orders` | Planned |
-| Admin: products, categories, CSV import with dry-run preview, all orders | `/admin/*` | Planned |
+| Checkout with test card shortcuts | `/checkout` | Done |
+| Order history with status filter, order details | `/orders`, `/orders/[id]` | Done |
+| Admin: products, categories, CSV import with dry-run preview, all orders | `/admin/*` | Next step |
 | Superadmin: administrators | `/admin/admins` | Planned |
 
 ### Catalog and cart
@@ -458,9 +459,20 @@ Next.js sets `X-Forwarded-For` only when the request does not already have one, 
 - Money is calculated in integer cents (`"0.10" * 3` is exactly `"0.30"`); amounts stay strings everywhere else, as in the API.
 - Staff accounts cannot buy: the cart icon is hidden, add-to-cart buttons are disabled with an explanation and `/cart` redirects to the catalog. The cart is cleared on sign-out, so the next person on a shared computer does not inherit it.
 
+### Checkout
+
+- Only customers can check out: `/checkout` and `/orders` redirect staff, guests are sent to sign in and come back. The cart is revalidated on the page as on `/cart`, and the pay button waits for it.
+- The card form formats the number and the expiry while typing and validates like the backend (12 to 19 digits, Luhn check, `MM/YY` not in the past and at most 20 years ahead, 3 or 4 digit CVC). Buttons fill in each fake-provider test card. Backend 422 errors for `payment.*` fields are shown under the matching inputs.
+- **Idempotency key per attempt.** A key is a random UUID, created when the buyer submits and tied to a SHA-256 fingerprint of the request body. Submitting the same body again after an unknown outcome (network error, 5xx, `409 checkout_in_progress`, rate limit) reuses the key, so the backend replays the original result instead of charging twice. A final answer (201, 402, 409 with cart changes, 422) drops the key, and any change to the cart or card produces a new fingerprint and a new key, so the backend never sees one key with two bodies (`422 idempotency_key_reused`).
+- The key lives in memory only, together with the fingerprint, because the body contains the card number. Reloading the page after a network error therefore starts a new attempt; the backend still cannot double-charge the same attempt, but a reload could create a second order if the first one had in fact succeeded. Keeping keys across reloads would need storing them per cart without card data.
+- **`409 price_changed` / `items_unavailable`:** the `items` from the response are applied to the cart (new price, reduced quantity, removed products), the buyer sees the list of changes and confirms by paying again.
+- **`402`:** the payment error is shown with a link to the `FAILED` order; the form keeps the cart and card so another card can be tried.
+- **`201`:** the cart is cleared and the buyer lands on the order page with a confirmation.
+- Order pages show status, items with the prices fixed at purchase, total, the last four card digits and the payment ID. Order numbers are the last 8 characters of the UUID v7: the first characters are a timestamp and would look almost the same for every order.
+
 ### Frontend tests
 
-Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping, the password rules shared with the backend, money arithmetic, cart limits and merging, cart revalidation, tolerant parsing of stored carts, catalog URL parsing and pagination.
+Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping, the password rules shared with the backend, money arithmetic, cart limits and merging, cart revalidation, tolerant parsing of stored carts, catalog URL parsing and pagination, card validation against the test cards, idempotency-key reuse rules, applying checkout 409 details and mapping payment field errors.
 
 ## Testing
 
