@@ -5,7 +5,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 | Part | Stack | Status |
 |---|---|---|
 | Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
-| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page, cart, checkout and order history are done. Admin screens are in progress. |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page, cart, checkout, order history and the admin area (products, categories, CSV import with preview, all orders, administrators) are done. |
 
 Most of this document describes the backend; see [Frontend](#frontend) for the web app.
 
@@ -410,6 +410,8 @@ frontend/
   src/lib/catalog         URL query parsing and links for the catalog
   src/lib/cart            cart rules, localStorage parsing, revalidation against current products
   src/lib/checkout        card validation, idempotency attempts, applying 409 details to the cart
+  src/lib/admin           CSV import rules: file checks, when a preview may be applied
+  src/app/admin           admin area: own layout and navigation, staff only
   src/lib/server          server-only helpers: backend calls, current user, BFF responses
   src/components/ui       shadcn/ui components (Radix primitives + Tailwind)
 ```
@@ -447,8 +449,11 @@ Next.js sets `X-Forwarded-For` only when the request does not already have one, 
 | Cart | `/cart` | Done |
 | Checkout with test card shortcuts | `/checkout` | Done |
 | Order history with status filter, order details | `/orders`, `/orders/[id]` | Done |
-| Admin: products, categories, CSV import with dry-run preview, all orders | `/admin/*` | Next step |
-| Superadmin: administrators | `/admin/admins` | Planned |
+| Admin: products (search, create, edit, delete) | `/admin/products` | Done |
+| Admin: categories (create, rename, delete) | `/admin/categories` | Done |
+| Admin: CSV import with dry-run preview | `/admin/import` | Done |
+| Admin: all orders, filter by status and customer | `/admin/orders` | Done |
+| Superadmin: administrators (add, reset password, deactivate, activate) | `/admin/admins` | Done |
 
 ### Catalog and cart
 
@@ -470,9 +475,19 @@ Next.js sets `X-Forwarded-For` only when the request does not already have one, 
 - **`201`:** the cart is cleared and the buyer lands on the order page with a confirmation.
 - Order pages show status, items with the prices fixed at purchase, total, the last four card digits and the payment ID. Order numbers are the last 8 characters of the UUID v7: the first characters are a timestamp and would look almost the same for every order.
 
+### Admin area
+
+- The admin area is part of the same Next.js app under `/admin`, not a separate application: it shares the session, the BFF, the API types and components, and the forced password change for new admins works without extra code. Next.js splits bundles per route, so customers never download admin code, and the backend checks permissions on every call anyway; the `/admin` layout only redirects non-staff for convenience. A separate app would make sense if the admin had to live in an internal network or use corporate SSO.
+- Staff land on `/admin` after sign-in and see an "Admin" link in the header; superadmins also get the Administrators page.
+- **Products**: table with search and category filter (a plain GET form, so the filter is in the URL), create and edit on a separate page with the same validation as the backend (SKU format, decimals, limits, control characters). Saving sends the `version` that was loaded; on `409 version_conflict` the form says someone else changed the product and offers to reload the latest version instead of overwriting it. Delete is confirmed in a dialog and explains that past orders keep their copy.
+- **Categories**: add, rename in place and delete; `category_exists` and `category_in_use` come back as readable messages.
+- **CSV import**: choose or drop a file (checked for `.csv` and 5 MB before uploading), pick the mode for existing SKUs, all-or-nothing and creating missing categories. *Preview* runs the import with `dry_run=true` and shows what would be created, updated, skipped and failed, new categories, duplicate SKUs and errors by line. *Import* is enabled only for exactly the previewed file and options; changing either requires a new preview. It is also disabled when the preview shows that nothing would change, or that an all-or-nothing import would roll back.
+- **Orders**: all orders with status filter; an order page links to all orders of that customer (`user_id` filter).
+- **Administrators** (superadmin): add by email, reset password, deactivate and activate. The temporary password is shown once in a dialog with a copy button and its expiry, and is never stored in the browser.
+
 ### Frontend tests
 
-Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping, the password rules shared with the backend, money arithmetic, cart limits and merging, cart revalidation, tolerant parsing of stored carts, catalog URL parsing and pagination, card validation against the test cards, idempotency-key reuse rules, applying checkout 409 details and mapping payment field errors.
+Vitest covers the logic where a mistake would break sessions or security, not the markup: the refresh coordinator (one backend call for parallel requests, reuse window, no caching of outages), cookie lifetimes and flags, the origin check, redirect rules and open-redirect protection, RFC 9457 error mapping, the password rules shared with the backend, money arithmetic, cart limits and merging, cart revalidation, tolerant parsing of stored carts, catalog URL parsing and pagination, card validation against the test cards, idempotency-key reuse rules, applying checkout 409 details and mapping payment field errors, product and category validation mirroring the backend, and the CSV import rules (file checks, when a preview may be applied).
 
 ## Testing
 

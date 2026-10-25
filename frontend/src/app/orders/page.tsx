@@ -18,7 +18,8 @@ const PAGE_SIZE = 20;
 
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
   await requireUser(["USER"], "/orders");
-  const query = parseOrderListQuery(await searchParams);
+  const { status, page: pageNumber } = parseOrderListQuery(await searchParams);
+  const query = { status, page: pageNumber };
   let page: Page<Order> | null = null;
   let error: unknown = null;
   try {
@@ -34,7 +35,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
           <h1 className="text-3xl font-semibold tracking-tight">Orders</h1>
           <p className="mt-1 text-muted-foreground">Your purchase history</p>
         </div>
-        <OrderStatusTabs base="/orders" status={query.status} />
+        <OrderStatusTabs base="/orders" query={query} />
       </div>
       <div className="mt-6">
         {error !== null && <FormAlert message={errorMessage(error)} />}

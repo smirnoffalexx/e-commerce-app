@@ -3,7 +3,7 @@ import { z } from "zod";
 export const PASSWORD_MIN_LENGTH = 10;
 export const PASSWORD_MAX_BYTES = 72;
 
-const email = z
+export const emailField = z
   .string()
   .trim()
   .min(1, "Email is required.")
@@ -19,12 +19,12 @@ const newPassword = z
   .refine((value) => value.trim().length > 0, { message: "Password must not be blank." });
 
 export const loginSchema = z.object({
-  email,
+  email: emailField,
   password: z.string().min(1, "Password is required."),
 });
 
 export const registerSchema = z
-  .object({ email, password: newPassword, confirm_password: z.string() })
+  .object({ email: emailField, password: newPassword, confirm_password: z.string() })
   .refine((data) => data.password.toLowerCase() !== data.email.toLowerCase(), {
     path: ["password"],
     message: "Password must not be the same as your email.",
@@ -48,3 +48,5 @@ export const changePasswordSchema = z
     path: ["confirm_password"],
     message: "Passwords do not match.",
   });
+
+export const adminSchema = z.object({ email: emailField });

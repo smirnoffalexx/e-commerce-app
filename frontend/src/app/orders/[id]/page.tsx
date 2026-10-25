@@ -51,15 +51,13 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
       )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          {!staff && (
-            <p className="mb-1 text-sm text-muted-foreground">
-              <Link href="/orders" className="hover:text-foreground">
-                Orders
-              </Link>{" "}
-              / #{shortOrderId(order.id)}
-            </p>
-          )}
-          <h1 className=" text-3xl font-semibold tracking-tight">
+          <p className="mb-1 text-sm text-muted-foreground">
+            <Link href={staff ? "/admin/orders" : "/orders"} className="hover:text-foreground">
+              Orders
+            </Link>{" "}
+            / #{shortOrderId(order.id)}
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">
             Order <span className="font-mono">#{shortOrderId(order.id)}</span>
           </h1>
           <p className="mt-1 text-muted-foreground">Placed {formatDateTime(order.created_at)}</p>
@@ -124,6 +122,16 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
           </CardContent>
         </Card>
       </div>
+      {staff && (
+        <div className="mt-8 flex gap-3">
+          <Button variant="outline" asChild>
+            <Link href="/admin/orders">All orders</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/admin/orders?user_id=${order.user_id}`}>Orders from {order.customer_email}</Link>
+          </Button>
+        </div>
+      )}
       {!staff && (
         <div className="mt-8 flex gap-3">
           <Button variant="outline" asChild>
