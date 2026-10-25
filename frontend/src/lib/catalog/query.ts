@@ -60,7 +60,7 @@ export function defaultSort(query: Pick<ProductQuery, "q">): ProductSort {
   return query.q ? "relevance" : "newest";
 }
 
-export function catalogHref(query: ProductQuery, changes: Partial<ProductQuery> = {}): string {
+export function catalogHref(query: ProductQuery, changes: Partial<ProductQuery> = {}, base = "/"): string {
   const merged: ProductQuery = { ...query, ...changes };
   if (!("page" in changes)) {
     delete merged.page;
@@ -74,7 +74,7 @@ export function catalogHref(query: ProductQuery, changes: Partial<ProductQuery> 
   if (merged.sort && merged.sort !== defaultSort(merged)) params.set("sort", merged.sort);
   if (merged.page && merged.page > 1) params.set("page", String(merged.page));
   const text = params.toString();
-  return text ? `/?${text}` : "/";
+  return text ? `${base}?${text}` : base;
 }
 
 export function hasFilters(query: ProductQuery): boolean {

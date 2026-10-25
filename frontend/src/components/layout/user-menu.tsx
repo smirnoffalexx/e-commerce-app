@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRoundIcon, LogOutIcon, ReceiptIcon, UserIcon } from "lucide-react";
+import { KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, ReceiptIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { clearCart } from "@/hooks/use-cart";
 import { authApi } from "@/lib/api/auth";
 import { errorMessage } from "@/lib/api/problem";
 import type { User } from "@/lib/api/types";
-import { roleLabels } from "@/lib/roles";
+import { isStaff, roleLabels } from "@/lib/roles";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,14 @@ export function UserMenu({ user }: { user: User }) {
             Account
           </Link>
         </DropdownMenuItem>
+        {isStaff(user.role) && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <LayoutDashboardIcon />
+              Admin
+            </Link>
+          </DropdownMenuItem>
+        )}
         {user.role === "USER" && (
           <DropdownMenuItem asChild>
             <Link href="/orders">

@@ -15,3 +15,7 @@ export const roleLabels: Record<Role, string> = {
 export function canPurchase(user: { role: Role } | null): boolean {
   return !user || user.role === "USER";
 }
+
+export function homePath(role: Role): string {
+  return isStaff(role) ? "/admin" : "/";
+}

@@ -1,6 +1,6 @@
 import { StoreIcon } from "lucide-react";
 import Link from "next/link";
-import { canPurchase } from "@/lib/roles";
+import { canPurchase, isStaff } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/server/api";
 import { CartButton } from "@/components/cart/cart-button";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,11 @@ export async function SiteHeader() {
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
           {canPurchase(user) && <CartButton />}
+          {user && isStaff(user.role) && (
+            <Button variant="outline" size="sm" asChild className="mr-1">
+              <Link href="/admin">Admin</Link>
+            </Button>
+          )}
           {user ? (
             <UserMenu user={user} />
           ) : (

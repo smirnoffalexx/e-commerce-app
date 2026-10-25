@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useApiForm } from "@/hooks/use-api-form";
 import { authApi } from "@/lib/api/auth";
+import { homePath } from "@/lib/roles";
 import { PASSWORD_MIN_LENGTH, changePasswordSchema } from "@/lib/validation/auth";
 import { FieldGroup } from "@/components/ui/field";
 import { FormAlert } from "./form-alert";
@@ -13,9 +14,9 @@ import { SubmitButton } from "./submit-button";
 export function ChangePasswordForm({ temporary }: { temporary: boolean }) {
   const router = useRouter();
   const { errors, formError, pending, onSubmit } = useApiForm(changePasswordSchema, async (values) => {
-    await authApi.changePassword({ current_password: values.current_password, new_password: values.new_password });
+    const result = await authApi.changePassword({ current_password: values.current_password, new_password: values.new_password });
     toast.success("Password changed. Other sessions were signed out.");
-    router.replace(temporary ? "/" : "/account");
+    router.replace(temporary ? homePath(result.user.role) : "/account");
     router.refresh();
   });
 

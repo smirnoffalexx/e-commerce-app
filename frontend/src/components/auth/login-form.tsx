@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApiForm } from "@/hooks/use-api-form";
 import { authApi } from "@/lib/api/auth";
+import { homePath } from "@/lib/roles";
 import { PASSWORD_CHANGE_PATH, safeNextPath } from "@/lib/session/routes";
 import { loginSchema } from "@/lib/validation/auth";
 import { FieldGroup } from "@/components/ui/field";
@@ -15,7 +16,7 @@ export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
   const { errors, formError, pending, onSubmit } = useApiForm(loginSchema, async (values) => {
     const result = await authApi.login(values);
-    router.replace(result.password_change_required ? `${PASSWORD_CHANGE_PATH}?required=1` : safeNextPath(next));
+    router.replace(result.password_change_required ? `${PASSWORD_CHANGE_PATH}?required=1` : safeNextPath(next, homePath(result.user.role)));
     router.refresh();
   });
 
