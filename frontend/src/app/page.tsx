@@ -1,32 +1,58 @@
-import { PackageSearchIcon, ShieldCheckIcon, TruckIcon } from "lucide-react";
+import { PackageSearchIcon } from "lucide-react";
+import Link from "next/link";
+import { CatalogPagination } from "@/components/catalog/catalog-pagination";
+import { CatalogView } from "@/components/catalog/catalog-view";
+import { ProductCard } from "@/components/catalog/product-card";
+import { FormAlert } from "@/components/auth/form-alert";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { errorMessage } from "@/lib/api/problem";
+import type { Category, Page, Product } from "@/lib/api/types";
+import { hasFilters, parseCatalogQuery } from "@/lib/catalog/query";
+import { listCategories, listProducts } from "@/lib/catalog/products";
+import { canPurchase } from "@/lib/roles";
+import { getCurrentUser } from "@/lib/server/api";
 
-const features = [
-  { icon: PackageSearchIcon, title: "Full-text search", text: "Find products by name, SKU or description." },
-  { icon: ShieldCheckIcon, title: "Secure checkout", text: "Prices and stock are verified when you pay." },
-  { icon: TruckIcon, title: "Order history", text: "Track every order from your account." },
-];
+export default async function CatalogPage({ searchParams }: PageProps<"/">) {
+  const query = parseCatalogQuery(await searchParams);
+  const [products, categories, user] = await Promise.allSettled([listProducts(query), listCategories(), getCurrentUser()]);
+  const page: Page<Product> | null = products.status === "fulfilled" ? products.value : null;
+  const categoryList: Category[] = categories.status === "fulfilled" ? categories.value : [];
+  const canBuy = canPurchase(user.status === "fulfilled" ? user.value : null);
 
-export default function HomePage() {
   return (
-    <section className="relative isolate overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent)]" />
-      <div className="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6">
-        <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Everything for your workshop, in one place
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-          Browse the catalog, compare prices and check out in seconds.
-        </p>
-        <div className="mx-auto mt-16 grid max-w-4xl gap-6 sm:grid-cols-3">
-          {features.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-xl border bg-card p-6 text-left shadow-sm">
-              <Icon className="size-6 text-primary" />
-              <h2 className="mt-4 font-medium">{title}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+    <CatalogView query={query} categories={categoryList} total={page?.total ?? null}>
+      {products.status === "rejected" && <FormAlert message={errorMessage(products.reason)} />}
+      {page && page.items.length === 0 && (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageSearchIcon />
+            </EmptyMedia>
+            <EmptyTitle>No products found</EmptyTitle>
+            <EmptyDescription>
+              {hasFilters(query) ? "Try a different search or remove some filters." : "The catalog is empty for now."}
+            </EmptyDescription>
+          </EmptyHeader>
+          {hasFilters(query) && (
+            <EmptyContent>
+              <Button variant="outline" asChild>
+                <Link href="/">Clear filters</Link>
+              </Button>
+            </EmptyContent>
+          )}
+        </Empty>
+      )}
+      {page && page.items.length > 0 && (
+        <>
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {page.items.map((product) => (
+              <ProductCard key={product.id} product={product} canBuy={canBuy} />
+            ))}
+          </div>
+          <CatalogPagination query={query} page={page.page} totalPages={page.total_pages} />
+        </>
+      )}
+    </CatalogView>
   );
 }

@@ -11,3 +11,7 @@ export const roleLabels: Record<Role, string> = {
   ADMIN: "Admin",
   SUPERADMIN: "Super admin",
 };
+
+export function canPurchase(user: { role: Role } | null): boolean {
+  return !user || user.role === "USER";
+}
