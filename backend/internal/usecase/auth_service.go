@@ -118,6 +118,9 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	if err != nil {
 		return domain.Session{}, err
 	}
+	if !u.Active {
+		return domain.Session{}, domain.ErrAccountInactive
+	}
 
 	var verr domain.ValidationError
 	if !s.hasher.Compare(u.PasswordHash, current) {
