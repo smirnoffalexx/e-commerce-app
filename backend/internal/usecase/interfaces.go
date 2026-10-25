@@ -49,6 +49,7 @@ type TempPasswordGenerator interface {
 
 type RefreshTokenStore interface {
 	Issue(ctx context.Context, userID uuid.UUID, ttl time.Duration) (string, error)
+	Lookup(ctx context.Context, token string) (uuid.UUID, error)
 	Consume(ctx context.Context, token string) (uuid.UUID, error)
 	Revoke(ctx context.Context, token string) error
 	RevokeAll(ctx context.Context, userID uuid.UUID) error

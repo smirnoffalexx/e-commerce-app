@@ -60,6 +60,24 @@ func (s *RefreshTokenStore) Issue(ctx context.Context, userID uuid.UUID, ttl tim
 	return token, nil
 }
 
+func (s *RefreshTokenStore) Lookup(ctx context.Context, token string) (uuid.UUID, error) {
+	if token == "" {
+		return uuid.Nil, domain.ErrInvalidToken
+	}
+	raw, err := s.client.Get(ctx, refreshKeyPrefix+hashToken(token)).Result()
+	if errors.Is(err, goredis.Nil) {
+		return uuid.Nil, domain.ErrInvalidToken
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("lookup refresh token: %w", err)
+	}
+	userID, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, domain.ErrInvalidToken
+	}
+	return userID, nil
+}
+
 func (s *RefreshTokenStore) Consume(ctx context.Context, token string) (uuid.UUID, error) {
 	if token == "" {
 		return uuid.Nil, domain.ErrInvalidToken

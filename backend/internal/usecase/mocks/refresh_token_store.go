@@ -188,6 +188,74 @@ func (_c *RefreshTokenStore_Issue_Call) RunAndReturn(run func(ctx context.Contex
 	return _c
 }
 
+// Lookup provides a mock function for the type RefreshTokenStore
+func (_mock *RefreshTokenStore) Lookup(ctx context.Context, token string) (uuid.UUID, error) {
+	ret := _mock.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Lookup")
+	}
+
+	var r0 uuid.UUID
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (uuid.UUID, error)); ok {
+		return returnFunc(ctx, token)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) uuid.UUID); ok {
+		r0 = returnFunc(ctx, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(uuid.UUID)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// RefreshTokenStore_Lookup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Lookup'
+type RefreshTokenStore_Lookup_Call struct {
+	*mock.Call
+}
+
+// Lookup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token string
+func (_e *RefreshTokenStore_Expecter) Lookup(ctx any, token any) *RefreshTokenStore_Lookup_Call {
+	return &RefreshTokenStore_Lookup_Call{Call: _e.mock.On("Lookup", ctx, token)}
+}
+
+func (_c *RefreshTokenStore_Lookup_Call) Run(run func(ctx context.Context, token string)) *RefreshTokenStore_Lookup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *RefreshTokenStore_Lookup_Call) Return(uUID uuid.UUID, err error) *RefreshTokenStore_Lookup_Call {
+	_c.Call.Return(uUID, err)
+	return _c
+}
+
+func (_c *RefreshTokenStore_Lookup_Call) RunAndReturn(run func(ctx context.Context, token string) (uuid.UUID, error)) *RefreshTokenStore_Lookup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Revoke provides a mock function for the type RefreshTokenStore
 func (_mock *RefreshTokenStore) Revoke(ctx context.Context, token string) error {
 	ret := _mock.Called(ctx, token)

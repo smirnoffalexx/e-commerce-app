@@ -69,7 +69,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (domain
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (domain.Session, error) {
-	userID, err := s.refresh.Consume(ctx, refreshToken)
+	userID, err := s.refresh.Lookup(ctx, refreshToken)
 	if err != nil {
 		return domain.Session{}, err
 	}
@@ -90,7 +90,19 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (domain.
 	if u.TempPasswordExpired(s.now()) {
 		return domain.Session{}, domain.ErrTempPasswordExpired
 	}
-	return s.newSession(ctx, &u)
+
+	// Burn the old token only after the new one is stored; a lost race revokes the new one.
+	session, err := s.newSession(ctx, &u)
+	if err != nil {
+		return domain.Session{}, err
+	}
+	if _, err := s.refresh.Consume(ctx, refreshToken); err != nil {
+		if rerr := s.refresh.Revoke(ctx, session.RefreshToken); rerr != nil {
+			return domain.Session{}, errors.Join(err, rerr)
+		}
+		return domain.Session{}, err
+	}
+	return session, nil
 }
 
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {

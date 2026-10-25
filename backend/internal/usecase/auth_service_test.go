@@ -171,9 +171,10 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("rotates token", func(t *testing.T) {
 		d := newAuth(t)
 		u := user(t, domain.RoleUser)
-		d.refresh.EXPECT().Consume(ctx, "old-refresh").Return(u.ID, nil)
+		d.refresh.EXPECT().Lookup(ctx, "old-refresh").Return(u.ID, nil)
 		d.users.EXPECT().GetByID(ctx, u.ID).Return(u, nil)
 		d.expectSession(u.ID)
+		d.refresh.EXPECT().Consume(ctx, "old-refresh").Return(u.ID, nil)
 
 		s, err := d.svc.Refresh(ctx, "old-refresh")
 		require.NoError(t, err)
@@ -182,7 +183,7 @@ func TestAuthService_Refresh(t *testing.T) {
 
 	t.Run("reused or unknown token", func(t *testing.T) {
 		d := newAuth(t)
-		d.refresh.EXPECT().Consume(ctx, "used").Return(uuid.Nil, domain.ErrInvalidToken)
+		d.refresh.EXPECT().Lookup(ctx, "used").Return(uuid.Nil, domain.ErrInvalidToken)
 
 		_, err := d.svc.Refresh(ctx, "used")
 		assert.ErrorIs(t, err, domain.ErrInvalidToken)
@@ -192,7 +193,7 @@ func TestAuthService_Refresh(t *testing.T) {
 		d := newAuth(t)
 		u := user(t, domain.RoleAdmin)
 		u.Active = false
-		d.refresh.EXPECT().Consume(ctx, "r").Return(u.ID, nil)
+		d.refresh.EXPECT().Lookup(ctx, "r").Return(u.ID, nil)
 		d.users.EXPECT().GetByID(ctx, u.ID).Return(u, nil)
 		d.refresh.EXPECT().RevokeAll(ctx, u.ID).Return(nil)
 
@@ -203,7 +204,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("deleted user", func(t *testing.T) {
 		d := newAuth(t)
 		id := uuid.Must(uuid.NewV7())
-		d.refresh.EXPECT().Consume(ctx, "r").Return(id, nil)
+		d.refresh.EXPECT().Lookup(ctx, "r").Return(id, nil)
 		d.users.EXPECT().GetByID(ctx, id).Return(domain.User{}, domain.ErrUserNotFound)
 
 		_, err := d.svc.Refresh(ctx, "r")
