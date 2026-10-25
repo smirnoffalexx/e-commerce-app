@@ -1,18 +1,16 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
-import type { ProductQuery } from "@/lib/api/types";
-import { catalogHref, pageWindow } from "@/lib/catalog/query";
+import { pageWindow } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
-export function CatalogPagination({ query, page, totalPages }: { query: ProductQuery; page: number; totalPages: number }) {
+export function Pager({ page, totalPages, href }: { page: number; totalPages: number; href: (page: number) => string }) {
   if (totalPages <= 1) {
     return null;
   }
-  const link = (target: number) => catalogHref(query, { page: target });
   return (
     <nav aria-label="Pagination" className="mt-10 flex items-center justify-center gap-1">
-      <PageLink href={link(page - 1)} disabled={page <= 1} label="Previous page">
+      <PageLink href={href(page - 1)} disabled={page <= 1} label="Previous page">
         <ChevronLeftIcon />
       </PageLink>
       {pageWindow(page, totalPages).map((item, index) =>
@@ -21,12 +19,12 @@ export function CatalogPagination({ query, page, totalPages }: { query: ProductQ
             …
           </span>
         ) : (
-          <PageLink key={item} href={link(item)} active={item === page} label={`Page ${item}`}>
+          <PageLink key={item} href={href(item)} active={item === page} label={`Page ${item}`}>
             {item}
           </PageLink>
         ),
       )}
-      <PageLink href={link(page + 1)} disabled={page >= totalPages} label="Next page">
+      <PageLink href={href(page + 1)} disabled={page >= totalPages} label="Next page">
         <ChevronRightIcon />
       </PageLink>
     </nav>

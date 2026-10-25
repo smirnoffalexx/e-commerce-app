@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PAGE_SIZE, catalogHref, pageWindow, parseCatalogQuery } from "./query";
+import { PAGE_SIZE, catalogHref, parseCatalogQuery } from "./query";
 
 const category = "01a1707a-4dd4-71dc-b154-789730a74595";
 
@@ -28,17 +28,5 @@ describe("catalogHref", () => {
     expect(catalogHref(query, { in_stock: true })).toBe("/?q=mug&in_stock=true");
     expect(catalogHref(query, { page: 5 })).toBe("/?q=mug&page=5");
     expect(catalogHref({}, { page: 1 })).toBe("/");
-  });
-});
-
-describe("pageWindow", () => {
-  it("shows every page when there are few", () => {
-    expect(pageWindow(2, 5)).toEqual([1, 2, 3, 4, 5]);
-  });
-
-  it("keeps the first and last pages around a window of neighbours", () => {
-    expect(pageWindow(10, 20)).toEqual([1, "gap", 8, 9, 10, 11, 12, "gap", 20]);
-    expect(pageWindow(1, 20)).toEqual([1, 2, 3, 4, 5, 6, "gap", 20]);
-    expect(pageWindow(20, 20)).toEqual([1, "gap", 15, 16, 17, 18, 19, 20]);
   });
 });

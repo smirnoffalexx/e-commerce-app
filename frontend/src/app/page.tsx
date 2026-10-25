@@ -1,14 +1,14 @@
 import { PackageSearchIcon } from "lucide-react";
 import Link from "next/link";
-import { CatalogPagination } from "@/components/catalog/catalog-pagination";
 import { CatalogView } from "@/components/catalog/catalog-view";
 import { ProductCard } from "@/components/catalog/product-card";
 import { FormAlert } from "@/components/auth/form-alert";
+import { Pager } from "@/components/pager";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { errorMessage } from "@/lib/api/problem";
 import type { Category, Page, Product } from "@/lib/api/types";
-import { hasFilters, parseCatalogQuery } from "@/lib/catalog/query";
+import { catalogHref, hasFilters, parseCatalogQuery } from "@/lib/catalog/query";
 import { listCategories, listProducts } from "@/lib/catalog/products";
 import { canPurchase } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/server/api";
@@ -50,7 +50,7 @@ export default async function CatalogPage({ searchParams }: PageProps<"/">) {
               <ProductCard key={product.id} product={product} canBuy={canBuy} />
             ))}
           </div>
-          <CatalogPagination query={query} page={page.page} totalPages={page.total_pages} />
+          <Pager page={page.page} totalPages={page.total_pages} href={(target) => catalogHref(query, { page: target })} />
         </>
       )}
     </CatalogView>
