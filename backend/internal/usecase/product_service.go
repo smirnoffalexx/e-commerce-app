@@ -31,18 +31,18 @@ func (s *ProductService) Get(ctx context.Context, id uuid.UUID) (domain.Product,
 	return s.products.GetByID(ctx, id)
 }
 
-func (s *ProductService) List(ctx context.Context, q ListProductsQuery) (Page[domain.Product], error) {
-	filter, page, err := q.toFilter()
+func (s *ProductService) List(ctx context.Context, q domain.ListProductsQuery) (domain.Page[domain.Product], error) {
+	filter, page, err := q.Filter()
 	if err != nil {
-		return Page[domain.Product]{}, err
+		return domain.Page[domain.Product]{}, err
 	}
 
 	items, total, err := s.products.List(ctx, filter)
 	if err != nil {
-		return Page[domain.Product]{}, err
+		return domain.Page[domain.Product]{}, err
 	}
 
-	return Page[domain.Product]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
+	return domain.Page[domain.Product]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
 }
 
 func (s *ProductService) Update(ctx context.Context, id uuid.UUID, version int, in domain.ProductInput) (domain.Product, error) {

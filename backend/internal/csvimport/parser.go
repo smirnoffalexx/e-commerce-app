@@ -32,7 +32,7 @@ func NewParser() Parser {
 	return Parser{}
 }
 
-func (Parser) Parse(r io.Reader) (usecase.ParsedCatalog, error) {
+func (Parser) Parse(r io.Reader) (domain.ParsedCatalog, error) {
 	br := bufio.NewReader(r)
 	if prefix, err := br.Peek(len(utf8BOM)); err == nil && bytes.Equal(prefix, utf8BOM) {
 		_, _ = br.Discard(len(utf8BOM))
@@ -43,17 +43,17 @@ func (Parser) Parse(r io.Reader) (usecase.ParsedCatalog, error) {
 
 	header, err := cr.Read()
 	if errors.Is(err, io.EOF) {
-		return usecase.ParsedCatalog{}, fileError(domain.CodeRequired, "file is empty")
+		return domain.ParsedCatalog{}, fileError(domain.CodeRequired, "file is empty")
 	}
 	if err != nil {
-		return usecase.ParsedCatalog{}, readError(err)
+		return domain.ParsedCatalog{}, readError(err)
 	}
 	index, err := headerIndex(header)
 	if err != nil {
-		return usecase.ParsedCatalog{}, err
+		return domain.ParsedCatalog{}, err
 	}
 
-	var out usecase.ParsedCatalog
+	var out domain.ParsedCatalog
 	for {
 		record, err := cr.Read()
 		if errors.Is(err, io.EOF) {
@@ -62,13 +62,13 @@ func (Parser) Parse(r io.Reader) (usecase.ParsedCatalog, error) {
 		var parseErr *csv.ParseError
 		if errors.As(err, &parseErr) {
 			out.DataRows++
-			out.Errors = append(out.Errors, usecase.ImportRowError{
+			out.Errors = append(out.Errors, domain.ImportRowError{
 				Line: parseErr.StartLine, Code: "malformed_row", Message: "row is not valid CSV: " + parseErr.Err.Error(),
 			})
 			continue
 		}
 		if err != nil {
-			return usecase.ParsedCatalog{}, readError(err)
+			return domain.ParsedCatalog{}, readError(err)
 		}
 		line, _ := cr.FieldPos(0)
 
@@ -78,10 +78,10 @@ func (Parser) Parse(r io.Reader) (usecase.ParsedCatalog, error) {
 		}
 		out.DataRows++
 		if out.DataRows > MaxRows {
-			return usecase.ParsedCatalog{}, fileError(domain.CodeTooLarge, fmt.Sprintf("file must contain at most %d rows", MaxRows))
+			return domain.ParsedCatalog{}, fileError(domain.CodeTooLarge, fmt.Sprintf("file must contain at most %d rows", MaxRows))
 		}
 		if len(record) != len(columns) {
-			out.Errors = append(out.Errors, usecase.ImportRowError{
+			out.Errors = append(out.Errors, domain.ImportRowError{
 				Line: line, Code: "column_count", Message: fmt.Sprintf("expected %d columns, got %d", len(columns), len(record)),
 			})
 			continue
@@ -140,10 +140,10 @@ func headerIndex(header []string) (map[string]int, error) {
 	return index, nil
 }
 
-func toRow(line int, record []string, index map[string]int) (usecase.ImportRow, []usecase.ImportRowError) {
+func toRow(line int, record []string, index map[string]int) (domain.ImportRow, []domain.ImportRowError) {
 	get := func(col string) string { return strings.TrimSpace(record[index[col]]) }
 
-	row := usecase.ImportRow{
+	row := domain.ImportRow{
 		Line:        line,
 		SKU:         get("sku"),
 		Name:        get("name"),
@@ -151,9 +151,9 @@ func toRow(line int, record []string, index map[string]int) (usecase.ImportRow, 
 		Category:    get("category"),
 	}
 
-	var errs []usecase.ImportRowError
+	var errs []domain.ImportRowError
 	fail := func(field, code, msg string) {
-		errs = append(errs, usecase.ImportRowError{Line: line, SKU: row.SKU, Field: field, Code: code, Message: msg})
+		errs = append(errs, domain.ImportRowError{Line: line, SKU: row.SKU, Field: field, Code: code, Message: msg})
 	}
 
 	row.Price = parseDecimal(get("price"), "price", fail)

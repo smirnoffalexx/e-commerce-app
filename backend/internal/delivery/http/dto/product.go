@@ -7,7 +7,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 type ProductRequest struct {
@@ -98,7 +97,7 @@ func NewProductResponse(p *domain.Product) ProductResponse {
 	return resp
 }
 
-func NewProductListResponse(page *usecase.Page[domain.Product]) ProductListResponse {
+func NewProductListResponse(page *domain.Page[domain.Product]) ProductListResponse {
 	items := make([]ProductResponse, 0, len(page.Items))
 	for i := range page.Items {
 		items = append(items, NewProductResponse(&page.Items[i]))

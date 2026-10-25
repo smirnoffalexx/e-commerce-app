@@ -20,21 +20,21 @@ func NewFakeProvider() *FakeProvider {
 	return &FakeProvider{}
 }
 
-func (FakeProvider) Charge(ctx context.Context, req usecase.PaymentRequest) (usecase.PaymentResult, error) {
+func (FakeProvider) Charge(ctx context.Context, req domain.PaymentRequest) (domain.PaymentResult, error) {
 	if err := ctx.Err(); err != nil {
-		return usecase.PaymentResult{}, err
+		return domain.PaymentResult{}, err
 	}
 
 	number := domain.NormalizeCardNumber(req.Card.Number)
 	switch {
 	case strings.HasSuffix(number, timeoutSuffix):
-		return usecase.PaymentResult{}, usecase.ErrPaymentTimeout
+		return domain.PaymentResult{}, usecase.ErrPaymentTimeout
 	case strings.HasSuffix(number, declinedSuffix):
-		return usecase.PaymentResult{DeclineCode: domain.FailureCardDeclined}, nil
+		return domain.PaymentResult{DeclineCode: domain.FailureCardDeclined}, nil
 	case strings.HasSuffix(number, insufficientFundsSuffix):
-		return usecase.PaymentResult{DeclineCode: "insufficient_funds"}, nil
+		return domain.PaymentResult{DeclineCode: "insufficient_funds"}, nil
 	}
-	return usecase.PaymentResult{Approved: true, PaymentID: "fake_" + req.IdempotencyKey}, nil
+	return domain.PaymentResult{Approved: true, PaymentID: "fake_" + req.IdempotencyKey}, nil
 }
 
 var _ usecase.PaymentProvider = FakeProvider{}

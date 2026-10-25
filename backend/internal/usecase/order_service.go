@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 
 	"e-commerce-backend/internal/domain"
 )
@@ -20,29 +19,6 @@ const (
 )
 
 var ErrPaymentTimeout = errors.New("payment provider timed out")
-
-type PaymentRequest struct {
-	IdempotencyKey string
-	Amount         decimal.Decimal
-	Card           domain.Card
-}
-
-type PaymentResult struct {
-	Approved    bool
-	PaymentID   string
-	DeclineCode string
-}
-
-type CheckoutResult struct {
-	Order    domain.Order
-	Replayed bool
-}
-
-type ListOrdersQuery struct {
-	UserID *uuid.UUID
-	Status domain.OrderStatus
-	PageRequest
-}
 
 type OrderService struct {
 	tx       Transactor
@@ -62,9 +38,9 @@ func (s *OrderService) WithClock(now func() time.Time) *OrderService {
 	return s
 }
 
-func (s *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (CheckoutResult, error) {
+func (s *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (domain.CheckoutResult, error) {
 	if err := in.Validate(s.now()); err != nil {
-		return CheckoutResult{}, err
+		return domain.CheckoutResult{}, err
 	}
 	if res, done, err := s.replay(ctx, userID, &in); done {
 		return res, err
@@ -76,17 +52,17 @@ func (s *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain
 	case err != nil:
 		slog.WarnContext(ctx, "checkout lock unavailable, relying on database uniqueness", slog.Any("error", err))
 	case !acquired:
-		return CheckoutResult{}, domain.ErrCheckoutInProgress
+		return domain.CheckoutResult{}, domain.ErrCheckoutInProgress
 	default:
 		defer s.release(ctx, lockKey, token)
 	}
 
 	customer, err := s.users.GetByID(ctx, userID)
 	if err != nil {
-		return CheckoutResult{}, err
+		return domain.CheckoutResult{}, err
 	}
 	if !customer.Active {
-		return CheckoutResult{}, domain.ErrAccountInactive
+		return domain.CheckoutResult{}, domain.ErrAccountInactive
 	}
 
 	order, err := s.reserve(ctx, &customer, &in)
@@ -94,17 +70,17 @@ func (s *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain
 		if res, done, err := s.replay(ctx, userID, &in); done {
 			return res, err
 		}
-		return CheckoutResult{}, domain.ErrCheckoutInProgress
+		return domain.CheckoutResult{}, domain.ErrCheckoutInProgress
 	}
 	if err != nil {
-		return CheckoutResult{}, err
+		return domain.CheckoutResult{}, err
 	}
 
 	order, err = s.pay(context.WithoutCancel(ctx), &order, in.Card)
 	if err != nil {
-		return CheckoutResult{}, err
+		return domain.CheckoutResult{}, err
 	}
-	return CheckoutResult{Order: order}, nil
+	return domain.CheckoutResult{Order: order}, nil
 }
 
 func (s *OrderService) Get(ctx context.Context, viewer domain.Principal, id uuid.UUID) (domain.Order, error) {
@@ -121,49 +97,42 @@ func (s *OrderService) Get(ctx context.Context, viewer domain.Principal, id uuid
 	return o, nil
 }
 
-func (s *OrderService) List(ctx context.Context, viewer domain.Principal, q ListOrdersQuery) (Page[domain.Order], error) {
-	var verr domain.ValidationError
-	page, err := q.normalize()
-	collect(&verr, err)
-	if q.Status != "" && !q.Status.Valid() {
-		verr.Add("status", domain.CodeInvalidFormat, "status must be one of PENDING, PAID, FAILED")
+func (s *OrderService) List(ctx context.Context, viewer domain.Principal, q domain.ListOrdersQuery) (domain.Page[domain.Order], error) {
+	filter, page, err := q.Filter()
+	if err != nil {
+		return domain.Page[domain.Order]{}, err
 	}
-	if err := verr.Err(); err != nil {
-		return Page[domain.Order]{}, err
-	}
-
-	filter := domain.OrderFilter{UserID: q.UserID, Status: q.Status, Limit: page.PageSize, Offset: page.offset()}
 	switch {
 	case viewer.Role.Can(domain.PermOrdersReadAll):
 	case viewer.Role.Can(domain.PermOrdersReadOwn):
 		if q.UserID != nil && *q.UserID != viewer.UserID {
-			return Page[domain.Order]{}, domain.ErrInsufficientPermissions
+			return domain.Page[domain.Order]{}, domain.ErrInsufficientPermissions
 		}
 		filter.UserID = &viewer.UserID
 	default:
-		return Page[domain.Order]{}, domain.ErrInsufficientPermissions
+		return domain.Page[domain.Order]{}, domain.ErrInsufficientPermissions
 	}
 
 	items, total, err := s.orders.List(ctx, filter)
 	if err != nil {
-		return Page[domain.Order]{}, err
+		return domain.Page[domain.Order]{}, err
 	}
-	return Page[domain.Order]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
+	return domain.Page[domain.Order]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
 }
 
-func (s *OrderService) replay(ctx context.Context, userID uuid.UUID, in *domain.CheckoutInput) (CheckoutResult, bool, error) {
+func (s *OrderService) replay(ctx context.Context, userID uuid.UUID, in *domain.CheckoutInput) (domain.CheckoutResult, bool, error) {
 	o, err := s.orders.GetByIdempotencyKey(ctx, userID, in.IdempotencyKey)
 	switch {
 	case errors.Is(err, domain.ErrOrderNotFound):
-		return CheckoutResult{}, false, nil
+		return domain.CheckoutResult{}, false, nil
 	case err != nil:
-		return CheckoutResult{}, true, err
+		return domain.CheckoutResult{}, true, err
 	case o.RequestHash != in.Fingerprint():
-		return CheckoutResult{}, true, domain.ErrIdempotencyKeyReused
+		return domain.CheckoutResult{}, true, domain.ErrIdempotencyKeyReused
 	case o.Status == domain.OrderPending:
-		return CheckoutResult{}, true, domain.ErrCheckoutInProgress
+		return domain.CheckoutResult{}, true, domain.ErrCheckoutInProgress
 	}
-	return CheckoutResult{Order: o, Replayed: true}, true, nil
+	return domain.CheckoutResult{Order: o, Replayed: true}, true, nil
 }
 
 func (s *OrderService) reserve(ctx context.Context, customer *domain.User, in *domain.CheckoutInput) (domain.Order, error) {
@@ -187,7 +156,7 @@ func (s *OrderService) reserve(ctx context.Context, customer *domain.User, in *d
 
 func (s *OrderService) pay(ctx context.Context, order *domain.Order, card domain.Card) (domain.Order, error) {
 	payCtx, cancel := context.WithTimeout(ctx, PaymentTimeout)
-	result, err := s.payments.Charge(payCtx, PaymentRequest{IdempotencyKey: order.ID.String(), Amount: order.Total, Card: card})
+	result, err := s.payments.Charge(payCtx, domain.PaymentRequest{IdempotencyKey: order.ID.String(), Amount: order.Total, Card: card})
 	cancel()
 
 	var failure string

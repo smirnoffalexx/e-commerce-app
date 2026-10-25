@@ -13,7 +13,6 @@ import (
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/delivery/http/response"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 const (
@@ -67,8 +66,8 @@ func (h *CatalogImportHandler) Import(c *gin.Context) {
 	}
 
 	q := response.NewQueryParser(c)
-	opts := usecase.ImportOptions{
-		Mode:                    usecase.ImportMode(c.Query("mode")),
+	opts := domain.ImportOptions{
+		Mode:                    domain.ImportMode(c.Query("mode")),
 		DryRun:                  q.Bool("dry_run"),
 		Atomic:                  q.Bool("atomic"),
 		CreateMissingCategories: q.Bool("create_missing_categories"),

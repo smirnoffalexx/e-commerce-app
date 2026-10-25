@@ -11,17 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 const header = "name,sku,description,category,price,stock,weight_kg\n"
 
-func parse(t *testing.T, content string) (usecase.ParsedCatalog, error) {
+func parse(t *testing.T, content string) (domain.ParsedCatalog, error) {
 	t.Helper()
 	return NewParser().Parse(strings.NewReader(content))
 }
 
-func errorsByLine(errs []usecase.ImportRowError) map[int][]string {
+func errorsByLine(errs []domain.ImportRowError) map[int][]string {
 	out := map[int][]string{}
 	for _, e := range errs {
 		out[e.Line] = append(out[e.Line], e.Field+":"+e.Code)
@@ -46,7 +45,7 @@ func TestParse_ExampleFile(t *testing.T) {
 		50: {"weight_kg:required"},
 	}, errorsByLine(parsed.Errors))
 
-	byLine := map[int]usecase.ImportRow{}
+	byLine := map[int]domain.ImportRow{}
 	for _, r := range parsed.Rows {
 		byLine[r.Line] = r
 	}

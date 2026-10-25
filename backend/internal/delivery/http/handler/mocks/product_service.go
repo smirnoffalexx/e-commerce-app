@@ -7,7 +7,6 @@ package mocks
 import (
 	"context"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
@@ -239,24 +238,24 @@ func (_c *ProductService_Get_Call) RunAndReturn(run func(ctx context.Context, id
 }
 
 // List provides a mock function for the type ProductService
-func (_mock *ProductService) List(ctx context.Context, q usecase.ListProductsQuery) (usecase.Page[domain.Product], error) {
+func (_mock *ProductService) List(ctx context.Context, q domain.ListProductsQuery) (domain.Page[domain.Product], error) {
 	ret := _mock.Called(ctx, q)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
 	}
 
-	var r0 usecase.Page[domain.Product]
+	var r0 domain.Page[domain.Product]
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.ListProductsQuery) (usecase.Page[domain.Product], error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ListProductsQuery) (domain.Page[domain.Product], error)); ok {
 		return returnFunc(ctx, q)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.ListProductsQuery) usecase.Page[domain.Product]); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ListProductsQuery) domain.Page[domain.Product]); ok {
 		r0 = returnFunc(ctx, q)
 	} else {
-		r0 = ret.Get(0).(usecase.Page[domain.Product])
+		r0 = ret.Get(0).(domain.Page[domain.Product])
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, usecase.ListProductsQuery) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.ListProductsQuery) error); ok {
 		r1 = returnFunc(ctx, q)
 	} else {
 		r1 = ret.Error(1)
@@ -271,20 +270,20 @@ type ProductService_List_Call struct {
 
 // List is a helper method to define mock.On call
 //   - ctx context.Context
-//   - q usecase.ListProductsQuery
+//   - q domain.ListProductsQuery
 func (_e *ProductService_Expecter) List(ctx any, q any) *ProductService_List_Call {
 	return &ProductService_List_Call{Call: _e.mock.On("List", ctx, q)}
 }
 
-func (_c *ProductService_List_Call) Run(run func(ctx context.Context, q usecase.ListProductsQuery)) *ProductService_List_Call {
+func (_c *ProductService_List_Call) Run(run func(ctx context.Context, q domain.ListProductsQuery)) *ProductService_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 usecase.ListProductsQuery
+		var arg1 domain.ListProductsQuery
 		if args[1] != nil {
-			arg1 = args[1].(usecase.ListProductsQuery)
+			arg1 = args[1].(domain.ListProductsQuery)
 		}
 		run(
 			arg0,
@@ -294,12 +293,12 @@ func (_c *ProductService_List_Call) Run(run func(ctx context.Context, q usecase.
 	return _c
 }
 
-func (_c *ProductService_List_Call) Return(page usecase.Page[domain.Product], err error) *ProductService_List_Call {
+func (_c *ProductService_List_Call) Return(page domain.Page[domain.Product], err error) *ProductService_List_Call {
 	_c.Call.Return(page, err)
 	return _c
 }
 
-func (_c *ProductService_List_Call) RunAndReturn(run func(ctx context.Context, q usecase.ListProductsQuery) (usecase.Page[domain.Product], error)) *ProductService_List_Call {
+func (_c *ProductService_List_Call) RunAndReturn(run func(ctx context.Context, q domain.ListProductsQuery) (domain.Page[domain.Product], error)) *ProductService_List_Call {
 	_c.Call.Return(run)
 	return _c
 }

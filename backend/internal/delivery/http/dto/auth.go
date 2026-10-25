@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 type CredentialsRequest struct {
@@ -54,7 +53,7 @@ func NewUserResponse(u *domain.User) UserResponse {
 	}
 }
 
-func NewSessionResponse(s *usecase.Session, now time.Time) SessionResponse {
+func NewSessionResponse(s *domain.Session, now time.Time) SessionResponse {
 	return SessionResponse{
 		TokenType:              "Bearer",
 		AccessToken:            s.AccessToken,

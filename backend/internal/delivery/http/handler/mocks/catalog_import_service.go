@@ -6,7 +6,7 @@ package mocks
 
 import (
 	"context"
-	"e-commerce-backend/internal/usecase"
+	"e-commerce-backend/internal/domain"
 	"io"
 
 	mock "github.com/stretchr/testify/mock"
@@ -49,24 +49,24 @@ func (_m *CatalogImportService) EXPECT() *CatalogImportService_Expecter {
 }
 
 // Import provides a mock function for the type CatalogImportService
-func (_mock *CatalogImportService) Import(ctx context.Context, r io.Reader, opts usecase.ImportOptions) (usecase.ImportReport, error) {
+func (_mock *CatalogImportService) Import(ctx context.Context, r io.Reader, opts domain.ImportOptions) (domain.ImportReport, error) {
 	ret := _mock.Called(ctx, r, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Import")
 	}
 
-	var r0 usecase.ImportReport
+	var r0 domain.ImportReport
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, io.Reader, usecase.ImportOptions) (usecase.ImportReport, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, io.Reader, domain.ImportOptions) (domain.ImportReport, error)); ok {
 		return returnFunc(ctx, r, opts)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, io.Reader, usecase.ImportOptions) usecase.ImportReport); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, io.Reader, domain.ImportOptions) domain.ImportReport); ok {
 		r0 = returnFunc(ctx, r, opts)
 	} else {
-		r0 = ret.Get(0).(usecase.ImportReport)
+		r0 = ret.Get(0).(domain.ImportReport)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, io.Reader, usecase.ImportOptions) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, io.Reader, domain.ImportOptions) error); ok {
 		r1 = returnFunc(ctx, r, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -82,12 +82,12 @@ type CatalogImportService_Import_Call struct {
 // Import is a helper method to define mock.On call
 //   - ctx context.Context
 //   - r io.Reader
-//   - opts usecase.ImportOptions
+//   - opts domain.ImportOptions
 func (_e *CatalogImportService_Expecter) Import(ctx any, r any, opts any) *CatalogImportService_Import_Call {
 	return &CatalogImportService_Import_Call{Call: _e.mock.On("Import", ctx, r, opts)}
 }
 
-func (_c *CatalogImportService_Import_Call) Run(run func(ctx context.Context, r io.Reader, opts usecase.ImportOptions)) *CatalogImportService_Import_Call {
+func (_c *CatalogImportService_Import_Call) Run(run func(ctx context.Context, r io.Reader, opts domain.ImportOptions)) *CatalogImportService_Import_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -97,9 +97,9 @@ func (_c *CatalogImportService_Import_Call) Run(run func(ctx context.Context, r 
 		if args[1] != nil {
 			arg1 = args[1].(io.Reader)
 		}
-		var arg2 usecase.ImportOptions
+		var arg2 domain.ImportOptions
 		if args[2] != nil {
-			arg2 = args[2].(usecase.ImportOptions)
+			arg2 = args[2].(domain.ImportOptions)
 		}
 		run(
 			arg0,
@@ -110,12 +110,12 @@ func (_c *CatalogImportService_Import_Call) Run(run func(ctx context.Context, r 
 	return _c
 }
 
-func (_c *CatalogImportService_Import_Call) Return(importReport usecase.ImportReport, err error) *CatalogImportService_Import_Call {
+func (_c *CatalogImportService_Import_Call) Return(importReport domain.ImportReport, err error) *CatalogImportService_Import_Call {
 	_c.Call.Return(importReport, err)
 	return _c
 }
 
-func (_c *CatalogImportService_Import_Call) RunAndReturn(run func(ctx context.Context, r io.Reader, opts usecase.ImportOptions) (usecase.ImportReport, error)) *CatalogImportService_Import_Call {
+func (_c *CatalogImportService_Import_Call) RunAndReturn(run func(ctx context.Context, r io.Reader, opts domain.ImportOptions) (domain.ImportReport, error)) *CatalogImportService_Import_Call {
 	_c.Call.Return(run)
 	return _c
 }

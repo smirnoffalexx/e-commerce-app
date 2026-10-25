@@ -30,27 +30,27 @@ func NewCatalogImportService(parser CatalogParser, tx Transactor, imports Catalo
 }
 
 type pendingRow struct {
-	row   ImportRow
+	row   domain.ImportRow
 	input domain.ProductInput
 	slug  string
 }
 
-func (s *CatalogImportService) Import(ctx context.Context, r io.Reader, opts ImportOptions) (ImportReport, error) {
+func (s *CatalogImportService) Import(ctx context.Context, r io.Reader, opts domain.ImportOptions) (domain.ImportReport, error) {
 	if opts.Mode == "" {
-		opts.Mode = ImportModeUpsert
+		opts.Mode = domain.ImportModeUpsert
 	}
 	if !opts.Mode.Valid() {
 		verr := &domain.ValidationError{}
 		verr.Add("mode", domain.CodeInvalidFormat, "mode must be one of upsert, skip, fail")
-		return ImportReport{}, verr
+		return domain.ImportReport{}, verr
 	}
 
 	parsed, err := s.parser.Parse(r)
 	if err != nil {
-		return ImportReport{}, err
+		return domain.ImportReport{}, err
 	}
 
-	report := ImportReport{
+	report := domain.ImportReport{
 		Options:   opts,
 		TotalRows: parsed.DataRows,
 		BlankRows: parsed.BlankRows,
@@ -90,7 +90,7 @@ func (s *CatalogImportService) Import(ctx context.Context, r io.Reader, opts Imp
 		report.Committed = true
 	case errors.Is(err, errRollbackDryRun), errors.Is(err, errRollbackAtomic):
 	default:
-		return ImportReport{}, err
+		return domain.ImportReport{}, err
 	}
 
 	sort.SliceStable(report.Errors, func(i, j int) bool { return report.Errors[i].Line < report.Errors[j].Line })
@@ -98,7 +98,7 @@ func (s *CatalogImportService) Import(ctx context.Context, r io.Reader, opts Imp
 	return report, nil
 }
 
-func (s *CatalogImportService) apply(ctx context.Context, pending []pendingRow, opts ImportOptions, report *ImportReport) error {
+func (s *CatalogImportService) apply(ctx context.Context, pending []pendingRow, opts domain.ImportOptions, report *domain.ImportReport) error {
 	categories, err := s.resolveCategories(ctx, pending, opts, report)
 	if err != nil {
 		return err
@@ -131,10 +131,10 @@ func (s *CatalogImportService) apply(ctx context.Context, pending []pendingRow, 
 				continue
 			}
 			toCreate = append(toCreate, product)
-		case opts.Mode == ImportModeSkip:
+		case opts.Mode == domain.ImportModeSkip:
 			report.Skipped++
-		case opts.Mode == ImportModeFail:
-			report.Errors = append(report.Errors, ImportRowError{
+		case opts.Mode == domain.ImportModeFail:
+			report.Errors = append(report.Errors, domain.ImportRowError{
 				Line: p.row.Line, SKU: p.input.SKU, Field: "sku", Code: "sku_taken", Message: "product with this SKU already exists",
 			})
 		default:
@@ -156,7 +156,7 @@ func (s *CatalogImportService) apply(ctx context.Context, pending []pendingRow, 
 	return nil
 }
 
-func (s *CatalogImportService) resolveCategories(ctx context.Context, pending []pendingRow, opts ImportOptions, report *ImportReport) (map[string]domain.Category, error) {
+func (s *CatalogImportService) resolveCategories(ctx context.Context, pending []pendingRow, opts domain.ImportOptions, report *domain.ImportReport) (map[string]domain.Category, error) {
 	names := make(map[string]string)
 	for i := range pending {
 		if _, ok := names[pending[i].slug]; !ok {
@@ -191,7 +191,7 @@ func (s *CatalogImportService) resolveCategories(ctx context.Context, pending []
 
 	for i := range pending {
 		if _, ok := found[pending[i].slug]; !ok {
-			report.Errors = append(report.Errors, ImportRowError{
+			report.Errors = append(report.Errors, domain.ImportRowError{
 				Line: pending[i].row.Line, SKU: pending[i].input.SKU, Field: "category", Code: "category_not_found",
 				Message: "category " + quote(pending[i].row.Category) + " does not exist",
 			})
@@ -200,7 +200,7 @@ func (s *CatalogImportService) resolveCategories(ctx context.Context, pending []
 	return found, nil
 }
 
-func dedupeBySKU(rows []ImportRow) ([]ImportRow, []ImportDuplicate) {
+func dedupeBySKU(rows []domain.ImportRow) ([]domain.ImportRow, []domain.ImportDuplicate) {
 	lastIndex := make(map[string]int, len(rows))
 	lines := make(map[string][]int)
 	for i, row := range rows {
@@ -212,8 +212,8 @@ func dedupeBySKU(rows []ImportRow) ([]ImportRow, []ImportDuplicate) {
 		lines[sku] = append(lines[sku], row.Line)
 	}
 
-	kept := make([]ImportRow, 0, len(rows))
-	var duplicates []ImportDuplicate
+	kept := make([]domain.ImportRow, 0, len(rows))
+	var duplicates []domain.ImportDuplicate
 	for i, row := range rows {
 		sku := domain.NormalizeSKU(row.SKU)
 		if sku != "" && lastIndex[sku] != i {
@@ -221,14 +221,14 @@ func dedupeBySKU(rows []ImportRow) ([]ImportRow, []ImportDuplicate) {
 		}
 		kept = append(kept, row)
 		if len(lines[sku]) > 1 {
-			duplicates = append(duplicates, ImportDuplicate{SKU: sku, Lines: lines[sku], AppliedLine: row.Line})
+			duplicates = append(duplicates, domain.ImportDuplicate{SKU: sku, Lines: lines[sku], AppliedLine: row.Line})
 		}
 	}
 	sort.Slice(duplicates, func(i, j int) bool { return duplicates[i].Lines[0] < duplicates[j].Lines[0] })
 	return kept, duplicates
 }
 
-func validateRow(row ImportRow) (pendingRow, []ImportRowError) {
+func validateRow(row domain.ImportRow) (pendingRow, []domain.ImportRowError) {
 	input := domain.ProductInput{
 		SKU:         row.SKU,
 		Name:        row.Name,
@@ -239,32 +239,32 @@ func validateRow(row ImportRow) (pendingRow, []ImportRowError) {
 		WeightKg:    row.WeightKg,
 	}
 
-	var errs []ImportRowError
+	var errs []domain.ImportRowError
 	if err := input.Validate(); err != nil {
 		errs = rowErrorsFrom(row, err)
 	}
 	slug := domain.Slugify(row.Category)
 	if slug == "" {
-		errs = append(errs, ImportRowError{Line: row.Line, SKU: row.SKU, Field: "category", Code: domain.CodeRequired, Message: "category is required"})
+		errs = append(errs, domain.ImportRowError{Line: row.Line, SKU: row.SKU, Field: "category", Code: domain.CodeRequired, Message: "category is required"})
 	}
 
 	input.SKU = domain.NormalizeSKU(input.SKU)
 	return pendingRow{row: row, input: input, slug: slug}, errs
 }
 
-func rowErrorsFrom(row ImportRow, err error) []ImportRowError {
+func rowErrorsFrom(row domain.ImportRow, err error) []domain.ImportRowError {
 	var verr *domain.ValidationError
 	if !errors.As(err, &verr) {
-		return []ImportRowError{{Line: row.Line, SKU: row.SKU, Code: "invalid_row", Message: err.Error()}}
+		return []domain.ImportRowError{{Line: row.Line, SKU: row.SKU, Code: "invalid_row", Message: err.Error()}}
 	}
-	out := make([]ImportRowError, 0, len(verr.Fields))
+	out := make([]domain.ImportRowError, 0, len(verr.Fields))
 	for _, f := range verr.Fields {
-		out = append(out, ImportRowError{Line: row.Line, SKU: row.SKU, Field: f.Field, Code: f.Code, Message: f.Message})
+		out = append(out, domain.ImportRowError{Line: row.Line, SKU: row.SKU, Field: f.Field, Code: f.Code, Message: f.Message})
 	}
 	return out
 }
 
-func countFailedLines(errs []ImportRowError) int {
+func countFailedLines(errs []domain.ImportRowError) int {
 	lines := make(map[int]struct{}, len(errs))
 	for _, e := range errs {
 		lines[e.Line] = struct{}{}

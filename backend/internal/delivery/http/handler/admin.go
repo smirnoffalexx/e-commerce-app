@@ -7,7 +7,7 @@ import (
 
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/delivery/http/response"
-	"e-commerce-backend/internal/usecase"
+	"e-commerce-backend/internal/domain"
 )
 
 type AdminHandler struct {
@@ -44,7 +44,7 @@ func (h *AdminHandler) Register(r gin.IRouter, guard ...gin.HandlerFunc) {
 //	@Router		/api/v1/admins [get]
 func (h *AdminHandler) List(c *gin.Context) {
 	q := response.NewQueryParser(c)
-	req := usecase.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")}
+	req := domain.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")}
 	if err := q.Err(); err != nil {
 		response.Error(c, err)
 		return

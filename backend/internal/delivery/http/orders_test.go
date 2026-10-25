@@ -16,7 +16,6 @@ import (
 
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 const checkoutProductID = "0192f6b8-3c5e-7a51-9d3f-2b1c4e5f6a7b"
@@ -68,7 +67,7 @@ func TestCheckout_PaidOrderIsCreated(t *testing.T) {
 		return in.IdempotencyKey == "checkout-1" &&
 			len(in.Lines) == 1 && in.Lines[0].Quantity == 2 &&
 			in.Lines[0].ExpectedPrice.Equal(decimal.RequireFromString("89.99"))
-	})).Return(usecase.CheckoutResult{Order: order}, nil)
+	})).Return(domain.CheckoutResult{Order: order}, nil)
 
 	w := a.checkout(validCheckout)
 	require.Equal(t, http.StatusCreated, w.Code)
@@ -84,7 +83,7 @@ func TestCheckout_PaidOrderIsCreated(t *testing.T) {
 func TestCheckout_ReplayIsMarked(t *testing.T) {
 	a := newTestAPI(t)
 	order := domain.Order{ID: uuid.Must(uuid.NewV7()), Status: domain.OrderPaid}
-	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(usecase.CheckoutResult{Order: order, Replayed: true}, nil)
+	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(domain.CheckoutResult{Order: order, Replayed: true}, nil)
 
 	w := a.checkout(validCheckout)
 	assert.Equal(t, http.StatusCreated, w.Code)
@@ -94,7 +93,7 @@ func TestCheckout_ReplayIsMarked(t *testing.T) {
 func TestCheckout_FailedPaymentIs402WithOrderID(t *testing.T) {
 	a := newTestAPI(t)
 	order := domain.Order{ID: uuid.Must(uuid.NewV7()), Status: domain.OrderFailed, FailureCode: domain.FailureCardDeclined}
-	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(usecase.CheckoutResult{Order: order}, nil)
+	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(domain.CheckoutResult{Order: order}, nil)
 
 	w := a.checkout(validCheckout)
 	require.Equal(t, http.StatusPaymentRequired, w.Code)
@@ -106,7 +105,7 @@ func TestCheckout_FailedPaymentIs402WithOrderID(t *testing.T) {
 func TestCheckout_PriceChangeReturnsCurrentPrices(t *testing.T) {
 	a := newTestAPI(t)
 	productID := uuid.MustParse(checkoutProductID)
-	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(usecase.CheckoutResult{}, &domain.CheckoutConflictError{
+	a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(domain.CheckoutResult{}, &domain.CheckoutConflictError{
 		Issues: []domain.CheckoutIssue{{
 			ProductID:         productID,
 			Code:              domain.IssuePriceChanged,
@@ -137,7 +136,7 @@ func TestCheckout_IdempotencyErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		a := newTestAPI(t)
-		a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(usecase.CheckoutResult{}, tc.err)
+		a.orders.EXPECT().Checkout(mock.Anything, customerID, mock.Anything).Return(domain.CheckoutResult{}, tc.err)
 
 		w := a.checkout(validCheckout)
 		assert.Equal(t, tc.wantStatus, w.Code)
@@ -148,8 +147,8 @@ func TestOrders_ReadPassesViewerToService(t *testing.T) {
 	a := newTestAPI(t)
 	other := uuid.Must(uuid.NewV7())
 	a.orders.EXPECT().List(mock.Anything, mock.MatchedBy(func(p domain.Principal) bool { return p.Role == domain.RoleAdmin }),
-		usecase.ListOrdersQuery{UserID: &other, Status: domain.OrderPaid, PageRequest: usecase.PageRequest{Page: 2}}).
-		Return(usecase.Page[domain.Order]{Page: 2, PageSize: 20}, nil)
+		domain.ListOrdersQuery{UserID: &other, Status: domain.OrderPaid, PageRequest: domain.PageRequest{Page: 2}}).
+		Return(domain.Page[domain.Order]{Page: 2, PageSize: 20}, nil)
 
 	w := a.do(http.MethodGet, "/api/v1/orders?user_id="+other.String()+"&status=PAID&page=2", "")
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())

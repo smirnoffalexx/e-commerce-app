@@ -68,7 +68,7 @@ func (d *importDeps) expectCatalog(categories []string, existing ...domain.Produ
 		}).Maybe()
 }
 
-func codes(errs []usecase.ImportRowError) map[int][]string {
+func codes(errs []domain.ImportRowError) map[int][]string {
 	out := map[int][]string{}
 	for _, e := range errs {
 		out[e.Line] = append(out[e.Line], e.Field+":"+e.Code)
@@ -96,11 +96,11 @@ func TestCatalogImport_ExampleFile(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = f.Close() }()
 
-	report, err := d.svc.Import(context.Background(), f, usecase.ImportOptions{CreateMissingCategories: true})
+	report, err := d.svc.Import(context.Background(), f, domain.ImportOptions{CreateMissingCategories: true})
 	require.NoError(t, err)
 
 	assert.True(t, report.Committed)
-	assert.Equal(t, usecase.ImportModeUpsert, report.Options.Mode, "upsert is the default mode")
+	assert.Equal(t, domain.ImportModeUpsert, report.Options.Mode, "upsert is the default mode")
 	assert.Equal(t, 95, report.TotalRows)
 	assert.Equal(t, 2, report.BlankRows)
 	assert.Equal(t, 85, report.Created)
@@ -114,7 +114,7 @@ func TestCatalogImport_ExampleFile(t *testing.T) {
 		50: {"weight_kg:required"},
 		52: {"category:required"},
 	}, codes(report.Errors))
-	assert.Equal(t, []usecase.ImportDuplicate{
+	assert.Equal(t, []domain.ImportDuplicate{
 		{SKU: "RS-001", Lines: []int{2, 36}, AppliedLine: 36},
 		{SKU: "BS-021", Lines: []int{11, 56, 89}, AppliedLine: 89},
 	}, report.Duplicates)
@@ -142,7 +142,7 @@ func TestCatalogImport_Modes(t *testing.T) {
 			return p.SKU == "OLD-1" && p.Name == "Updated" && p.Stock == 5
 		})).Return(nil)
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{Mode: usecase.ImportModeUpsert})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: domain.ImportModeUpsert})
 		require.NoError(t, err)
 		assert.Equal(t, 1, report.Created)
 		assert.Equal(t, 1, report.Updated)
@@ -153,7 +153,7 @@ func TestCatalogImport_Modes(t *testing.T) {
 		d.expectTx()
 		d.expectCatalog([]string{"Misc"}, existingProduct2(t, "OLD-1"))
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{Mode: usecase.ImportModeSkip})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: domain.ImportModeSkip})
 		require.NoError(t, err)
 		assert.Equal(t, 1, report.Created)
 		assert.Equal(t, 1, report.Skipped)
@@ -165,7 +165,7 @@ func TestCatalogImport_Modes(t *testing.T) {
 		d.expectTx()
 		d.expectCatalog([]string{"Misc"}, existingProduct2(t, "OLD-1"))
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{Mode: usecase.ImportModeFail})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: domain.ImportModeFail})
 		require.NoError(t, err)
 		assert.True(t, report.Committed)
 		assert.Equal(t, 1, report.Created)
@@ -174,7 +174,7 @@ func TestCatalogImport_Modes(t *testing.T) {
 
 	t.Run("unknown mode is rejected before parsing", func(t *testing.T) {
 		d := newImport(t)
-		_, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{Mode: "merge"})
+		_, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: "merge"})
 		assert.ErrorIs(t, err, domain.ErrValidation)
 	})
 }
@@ -188,7 +188,7 @@ func TestCatalogImport_Categories(t *testing.T) {
 		d.expectTx()
 		d.expectCatalog([]string{"Misc"})
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, report.Created)
 		assert.Equal(t, map[int][]string{2: {"category:category_not_found"}, 3: {"category:category_not_found"}}, codes(report.Errors))
@@ -200,7 +200,7 @@ func TestCatalogImport_Categories(t *testing.T) {
 		d.expectCatalog([]string{"Misc"})
 		d.categories.EXPECT().Create(mock.Anything, mock.MatchedBy(func(c *domain.Category) bool { return c.Slug == "toys" })).Return(nil).Once()
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{CreateMissingCategories: true})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{CreateMissingCategories: true})
 		require.NoError(t, err)
 		assert.Equal(t, 3, report.Created)
 		assert.Equal(t, []string{"Toys"}, report.CreatedCategories)
@@ -227,7 +227,7 @@ func TestCatalogImport_DryRunAndAtomic(t *testing.T) {
 		fnErr := rollbackTx(d)
 		d.expectCatalog([]string{"Misc"})
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{DryRun: true})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{DryRun: true})
 		require.NoError(t, err)
 		assert.False(t, report.Committed)
 		assert.Equal(t, 1, report.Created)
@@ -240,7 +240,7 @@ func TestCatalogImport_DryRunAndAtomic(t *testing.T) {
 		fnErr := rollbackTx(d)
 		d.expectCatalog([]string{"Misc"})
 
-		report, err := d.svc.Import(ctx, strings.NewReader(file), usecase.ImportOptions{Atomic: true})
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Atomic: true})
 		require.NoError(t, err)
 		assert.False(t, report.Committed)
 		assert.Error(t, *fnErr)
@@ -251,7 +251,7 @@ func TestCatalogImport_DryRunAndAtomic(t *testing.T) {
 		fnErr := rollbackTx(d)
 		d.expectCatalog([]string{"Misc"})
 
-		report, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"Good,G-1,,Misc,1,1,1\n"), usecase.ImportOptions{Atomic: true})
+		report, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"Good,G-1,,Misc,1,1,1\n"), domain.ImportOptions{Atomic: true})
 		require.NoError(t, err)
 		assert.True(t, report.Committed)
 		assert.NoError(t, *fnErr)
@@ -263,7 +263,7 @@ func TestCatalogImport_Failures(t *testing.T) {
 
 	t.Run("invalid header never opens a transaction", func(t *testing.T) {
 		d := newImport(t)
-		_, err := d.svc.Import(ctx, strings.NewReader("foo,bar\n"), usecase.ImportOptions{})
+		_, err := d.svc.Import(ctx, strings.NewReader("foo,bar\n"), domain.ImportOptions{})
 		assert.ErrorIs(t, err, domain.ErrValidation)
 	})
 
@@ -273,7 +273,7 @@ func TestCatalogImport_Failures(t *testing.T) {
 		boom := errors.New("connection reset")
 		d.repo.EXPECT().CategoriesBySlugs(mock.Anything, mock.Anything).Return(nil, boom)
 
-		_, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"A,A-1,,Misc,1,1,1\n"), usecase.ImportOptions{})
+		_, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"A,A-1,,Misc,1,1,1\n"), domain.ImportOptions{})
 		assert.ErrorIs(t, err, boom)
 	})
 
@@ -285,7 +285,7 @@ func TestCatalogImport_Failures(t *testing.T) {
 		d.repo.EXPECT().ProductsBySKUs(mock.Anything, mock.Anything).Return(map[string]domain.Product{}, nil)
 		d.repo.EXPECT().CreateProducts(mock.Anything, mock.Anything).Return(domain.ErrSKUTaken)
 
-		_, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"A,A-1,,Misc,1,1,1\n"), usecase.ImportOptions{})
+		_, err := d.svc.Import(ctx, strings.NewReader(csvHeader+"A,A-1,,Misc,1,1,1\n"), domain.ImportOptions{})
 		assert.ErrorIs(t, err, domain.ErrConflict)
 	})
 }

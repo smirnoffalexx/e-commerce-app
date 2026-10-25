@@ -98,9 +98,9 @@ func TestOrderService_Checkout_Paid(t *testing.T) {
 	d.expectNoPreviousOrder()
 	d.expectLock()
 	d.expectReservation()
-	d.payments.EXPECT().Charge(mock.Anything, mock.MatchedBy(func(r usecase.PaymentRequest) bool {
+	d.payments.EXPECT().Charge(mock.Anything, mock.MatchedBy(func(r domain.PaymentRequest) bool {
 		return r.Amount.Equal(decimal.RequireFromString("179.98")) && r.IdempotencyKey == d.created.ID.String()
-	})).Return(usecase.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil)
+	})).Return(domain.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil)
 	d.expectFinalize()
 
 	res, err := d.svc.Checkout(context.Background(), d.customer.ID, d.input(2, "89.99"))
@@ -122,11 +122,11 @@ func TestOrderService_Checkout_PaymentChargedWithDeadlineEvenIfClientLeft(t *tes
 	d.expectLock()
 	d.expectReservation(cancel)
 	d.payments.EXPECT().Charge(mock.Anything, mock.Anything).
-		RunAndReturn(func(ctx context.Context, _ usecase.PaymentRequest) (usecase.PaymentResult, error) {
+		RunAndReturn(func(ctx context.Context, _ domain.PaymentRequest) (domain.PaymentResult, error) {
 			_, hasDeadline := ctx.Deadline()
 			assert.True(t, hasDeadline)
 			assert.NoError(t, ctx.Err(), "client disconnect must not abort a reserved order")
-			return usecase.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil
+			return domain.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil
 		})
 	d.expectFinalize()
 
@@ -138,16 +138,16 @@ func TestOrderService_Checkout_PaymentChargedWithDeadlineEvenIfClientLeft(t *tes
 func TestOrderService_Checkout_FailedPaymentReleasesStock(t *testing.T) {
 	cases := []struct {
 		name     string
-		result   usecase.PaymentResult
+		result   domain.PaymentResult
 		err      error
 		wantCode string
 	}{
-		{"declined", usecase.PaymentResult{DeclineCode: domain.FailureCardDeclined}, nil, domain.FailureCardDeclined},
-		{"declined without reason", usecase.PaymentResult{}, nil, domain.FailureCardDeclined},
-		{"insufficient funds", usecase.PaymentResult{DeclineCode: "insufficient_funds"}, nil, "insufficient_funds"},
-		{"timeout", usecase.PaymentResult{}, usecase.ErrPaymentTimeout, domain.FailurePaymentTimeout},
-		{"deadline", usecase.PaymentResult{}, context.DeadlineExceeded, domain.FailurePaymentTimeout},
-		{"provider error", usecase.PaymentResult{}, errors.New("connection reset"), domain.FailurePaymentError},
+		{"declined", domain.PaymentResult{DeclineCode: domain.FailureCardDeclined}, nil, domain.FailureCardDeclined},
+		{"declined without reason", domain.PaymentResult{}, nil, domain.FailureCardDeclined},
+		{"insufficient funds", domain.PaymentResult{DeclineCode: "insufficient_funds"}, nil, "insufficient_funds"},
+		{"timeout", domain.PaymentResult{}, usecase.ErrPaymentTimeout, domain.FailurePaymentTimeout},
+		{"deadline", domain.PaymentResult{}, context.DeadlineExceeded, domain.FailurePaymentTimeout},
+		{"provider error", domain.PaymentResult{}, errors.New("connection reset"), domain.FailurePaymentError},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -370,14 +370,14 @@ func TestOrderService_List(t *testing.T) {
 		d.orders.EXPECT().List(ctx, domain.OrderFilter{UserID: &me, Status: domain.OrderPaid, Limit: 20, Offset: 0}).
 			Return([]domain.Order{{ID: uuid.Must(uuid.NewV7())}}, 1, nil)
 
-		page, err := d.svc.List(ctx, domain.Principal{UserID: me, Role: domain.RoleUser}, usecase.ListOrdersQuery{Status: domain.OrderPaid})
+		page, err := d.svc.List(ctx, domain.Principal{UserID: me, Role: domain.RoleUser}, domain.ListOrdersQuery{Status: domain.OrderPaid})
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), page.Total)
 	})
 
 	t.Run("customer cannot ask for someone else's orders", func(t *testing.T) {
 		d := newOrders(t)
-		_, err := d.svc.List(ctx, domain.Principal{UserID: me, Role: domain.RoleUser}, usecase.ListOrdersQuery{UserID: &other})
+		_, err := d.svc.List(ctx, domain.Principal{UserID: me, Role: domain.RoleUser}, domain.ListOrdersQuery{UserID: &other})
 		assert.ErrorIs(t, err, domain.ErrInsufficientPermissions)
 	})
 
@@ -387,16 +387,16 @@ func TestOrderService_List(t *testing.T) {
 		d.orders.EXPECT().List(ctx, domain.OrderFilter{UserID: &other, Limit: 20}).Return(nil, 0, nil)
 
 		admin := domain.Principal{UserID: me, Role: domain.RoleAdmin}
-		_, err := d.svc.List(ctx, admin, usecase.ListOrdersQuery{PageRequest: usecase.PageRequest{Page: 2, PageSize: 10}})
+		_, err := d.svc.List(ctx, admin, domain.ListOrdersQuery{PageRequest: domain.PageRequest{Page: 2, PageSize: 10}})
 		require.NoError(t, err)
-		_, err = d.svc.List(ctx, admin, usecase.ListOrdersQuery{UserID: &other})
+		_, err = d.svc.List(ctx, admin, domain.ListOrdersQuery{UserID: &other})
 		require.NoError(t, err)
 	})
 
 	t.Run("invalid status and paging are reported together", func(t *testing.T) {
 		d := newOrders(t)
 		_, err := d.svc.List(ctx, domain.Principal{UserID: me, Role: domain.RoleAdmin},
-			usecase.ListOrdersQuery{Status: "SHIPPED", PageRequest: usecase.PageRequest{PageSize: 1000}})
+			domain.ListOrdersQuery{Status: "SHIPPED", PageRequest: domain.PageRequest{PageSize: 1000}})
 
 		var verr *domain.ValidationError
 		require.ErrorAs(t, err, &verr)

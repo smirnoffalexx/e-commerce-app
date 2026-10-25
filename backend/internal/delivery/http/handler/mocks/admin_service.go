@@ -7,7 +7,6 @@ package mocks
 import (
 	"context"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
@@ -50,22 +49,22 @@ func (_m *AdminService) EXPECT() *AdminService_Expecter {
 }
 
 // Create provides a mock function for the type AdminService
-func (_mock *AdminService) Create(ctx context.Context, email string) (usecase.AdminCredentials, error) {
+func (_mock *AdminService) Create(ctx context.Context, email string) (domain.AdminCredentials, error) {
 	ret := _mock.Called(ctx, email)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
-	var r0 usecase.AdminCredentials
+	var r0 domain.AdminCredentials
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (usecase.AdminCredentials, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (domain.AdminCredentials, error)); ok {
 		return returnFunc(ctx, email)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) usecase.AdminCredentials); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) domain.AdminCredentials); ok {
 		r0 = returnFunc(ctx, email)
 	} else {
-		r0 = ret.Get(0).(usecase.AdminCredentials)
+		r0 = ret.Get(0).(domain.AdminCredentials)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, email)
@@ -105,35 +104,35 @@ func (_c *AdminService_Create_Call) Run(run func(ctx context.Context, email stri
 	return _c
 }
 
-func (_c *AdminService_Create_Call) Return(adminCredentials usecase.AdminCredentials, err error) *AdminService_Create_Call {
+func (_c *AdminService_Create_Call) Return(adminCredentials domain.AdminCredentials, err error) *AdminService_Create_Call {
 	_c.Call.Return(adminCredentials, err)
 	return _c
 }
 
-func (_c *AdminService_Create_Call) RunAndReturn(run func(ctx context.Context, email string) (usecase.AdminCredentials, error)) *AdminService_Create_Call {
+func (_c *AdminService_Create_Call) RunAndReturn(run func(ctx context.Context, email string) (domain.AdminCredentials, error)) *AdminService_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // List provides a mock function for the type AdminService
-func (_mock *AdminService) List(ctx context.Context, req usecase.PageRequest) (usecase.Page[domain.User], error) {
+func (_mock *AdminService) List(ctx context.Context, req domain.PageRequest) (domain.Page[domain.User], error) {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
 	}
 
-	var r0 usecase.Page[domain.User]
+	var r0 domain.Page[domain.User]
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.PageRequest) (usecase.Page[domain.User], error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.PageRequest) (domain.Page[domain.User], error)); ok {
 		return returnFunc(ctx, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.PageRequest) usecase.Page[domain.User]); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.PageRequest) domain.Page[domain.User]); ok {
 		r0 = returnFunc(ctx, req)
 	} else {
-		r0 = ret.Get(0).(usecase.Page[domain.User])
+		r0 = ret.Get(0).(domain.Page[domain.User])
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, usecase.PageRequest) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.PageRequest) error); ok {
 		r1 = returnFunc(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -148,20 +147,20 @@ type AdminService_List_Call struct {
 
 // List is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req usecase.PageRequest
+//   - req domain.PageRequest
 func (_e *AdminService_Expecter) List(ctx any, req any) *AdminService_List_Call {
 	return &AdminService_List_Call{Call: _e.mock.On("List", ctx, req)}
 }
 
-func (_c *AdminService_List_Call) Run(run func(ctx context.Context, req usecase.PageRequest)) *AdminService_List_Call {
+func (_c *AdminService_List_Call) Run(run func(ctx context.Context, req domain.PageRequest)) *AdminService_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 usecase.PageRequest
+		var arg1 domain.PageRequest
 		if args[1] != nil {
-			arg1 = args[1].(usecase.PageRequest)
+			arg1 = args[1].(domain.PageRequest)
 		}
 		run(
 			arg0,
@@ -171,33 +170,33 @@ func (_c *AdminService_List_Call) Run(run func(ctx context.Context, req usecase.
 	return _c
 }
 
-func (_c *AdminService_List_Call) Return(page usecase.Page[domain.User], err error) *AdminService_List_Call {
+func (_c *AdminService_List_Call) Return(page domain.Page[domain.User], err error) *AdminService_List_Call {
 	_c.Call.Return(page, err)
 	return _c
 }
 
-func (_c *AdminService_List_Call) RunAndReturn(run func(ctx context.Context, req usecase.PageRequest) (usecase.Page[domain.User], error)) *AdminService_List_Call {
+func (_c *AdminService_List_Call) RunAndReturn(run func(ctx context.Context, req domain.PageRequest) (domain.Page[domain.User], error)) *AdminService_List_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ResetPassword provides a mock function for the type AdminService
-func (_mock *AdminService) ResetPassword(ctx context.Context, id uuid.UUID) (usecase.AdminCredentials, error) {
+func (_mock *AdminService) ResetPassword(ctx context.Context, id uuid.UUID) (domain.AdminCredentials, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ResetPassword")
 	}
 
-	var r0 usecase.AdminCredentials
+	var r0 domain.AdminCredentials
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (usecase.AdminCredentials, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (domain.AdminCredentials, error)); ok {
 		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) usecase.AdminCredentials); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) domain.AdminCredentials); ok {
 		r0 = returnFunc(ctx, id)
 	} else {
-		r0 = ret.Get(0).(usecase.AdminCredentials)
+		r0 = ret.Get(0).(domain.AdminCredentials)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
 		r1 = returnFunc(ctx, id)
@@ -237,12 +236,12 @@ func (_c *AdminService_ResetPassword_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *AdminService_ResetPassword_Call) Return(adminCredentials usecase.AdminCredentials, err error) *AdminService_ResetPassword_Call {
+func (_c *AdminService_ResetPassword_Call) Return(adminCredentials domain.AdminCredentials, err error) *AdminService_ResetPassword_Call {
 	_c.Call.Return(adminCredentials, err)
 	return _c
 }
 
-func (_c *AdminService_ResetPassword_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (usecase.AdminCredentials, error)) *AdminService_ResetPassword_Call {
+func (_c *AdminService_ResetPassword_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (domain.AdminCredentials, error)) *AdminService_ResetPassword_Call {
 	_c.Call.Return(run)
 	return _c
 }

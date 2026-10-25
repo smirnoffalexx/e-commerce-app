@@ -71,7 +71,7 @@ type OrderRepository interface {
 }
 
 type PaymentProvider interface {
-	Charge(ctx context.Context, req PaymentRequest) (PaymentResult, error)
+	Charge(ctx context.Context, req domain.PaymentRequest) (domain.PaymentResult, error)
 }
 
 type CheckoutLocker interface {

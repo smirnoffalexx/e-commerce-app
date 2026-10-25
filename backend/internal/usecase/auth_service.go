@@ -13,14 +13,6 @@ import (
 
 const RefreshTokenTTL = 7 * 24 * time.Hour
 
-type Session struct {
-	AccessToken           string
-	AccessTokenExpiresAt  time.Time
-	RefreshToken          string
-	RefreshTokenExpiresAt time.Time
-	User                  domain.User
-}
-
 type AuthService struct {
 	users   UserRepository
 	hasher  PasswordHasher
@@ -57,46 +49,46 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 	return u, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (Session, error) {
+func (s *AuthService) Login(ctx context.Context, email, password string) (domain.Session, error) {
 	u, err := s.users.GetByEmail(ctx, email)
 	if errors.Is(err, domain.ErrUserNotFound) {
 		s.hasher.Compare("", password)
-		return Session{}, domain.ErrInvalidCredentials
+		return domain.Session{}, domain.ErrInvalidCredentials
 	}
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 
 	if !s.hasher.Compare(u.PasswordHash, password) || !u.Active {
-		return Session{}, domain.ErrInvalidCredentials
+		return domain.Session{}, domain.ErrInvalidCredentials
 	}
 	if u.TempPasswordExpired(s.now()) {
-		return Session{}, domain.ErrTempPasswordExpired
+		return domain.Session{}, domain.ErrTempPasswordExpired
 	}
 	return s.newSession(ctx, &u)
 }
 
-func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (Session, error) {
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (domain.Session, error) {
 	userID, err := s.refresh.Consume(ctx, refreshToken)
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 
 	u, err := s.users.GetByID(ctx, userID)
 	if errors.Is(err, domain.ErrUserNotFound) {
-		return Session{}, domain.ErrInvalidToken
+		return domain.Session{}, domain.ErrInvalidToken
 	}
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	if !u.Active {
 		if err := s.refresh.RevokeAll(ctx, u.ID); err != nil {
-			return Session{}, err
+			return domain.Session{}, err
 		}
-		return Session{}, domain.ErrInvalidToken
+		return domain.Session{}, domain.ErrInvalidToken
 	}
 	if u.TempPasswordExpired(s.now()) {
-		return Session{}, domain.ErrTempPasswordExpired
+		return domain.Session{}, domain.ErrTempPasswordExpired
 	}
 	return s.newSession(ctx, &u)
 }
@@ -109,35 +101,35 @@ func (s *AuthService) Me(ctx context.Context, userID uuid.UUID) (domain.User, er
 	return s.users.GetByID(ctx, userID)
 }
 
-func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, current, next string) (Session, error) {
+func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, current, next string) (domain.Session, error) {
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 
 	var verr domain.ValidationError
 	if !s.hasher.Compare(u.PasswordHash, current) {
 		verr.Add("current_password", "incorrect", "current password is incorrect")
-		return Session{}, &verr
+		return domain.Session{}, &verr
 	}
 	if err := domain.ValidatePassword("new_password", next, u.Email); err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	if next == current {
 		verr.Add("new_password", "same_as_current", "new password must differ from the current one")
-		return Session{}, &verr
+		return domain.Session{}, &verr
 	}
 
 	hash, err := s.hasher.Hash(next)
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	u.SetPassword(hash)
 	if err := s.users.Update(ctx, &u); err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	if err := s.refresh.RevokeAll(ctx, u.ID); err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	return s.newSession(ctx, &u)
 }
@@ -175,16 +167,16 @@ func (s *AuthService) EnsureSuperAdmin(ctx context.Context, email, password stri
 	return nil
 }
 
-func (s *AuthService) newSession(ctx context.Context, u *domain.User) (Session, error) {
+func (s *AuthService) newSession(ctx context.Context, u *domain.User) (domain.Session, error) {
 	access, accessExp, err := s.access.Issue(u)
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
 	refresh, err := s.refresh.Issue(ctx, u.ID, RefreshTokenTTL)
 	if err != nil {
-		return Session{}, err
+		return domain.Session{}, err
 	}
-	return Session{
+	return domain.Session{
 		AccessToken:           access,
 		AccessTokenExpiresAt:  accessExp,
 		RefreshToken:          refresh,

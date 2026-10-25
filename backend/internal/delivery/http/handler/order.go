@@ -10,7 +10,6 @@ import (
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/delivery/http/response"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 const (
@@ -135,10 +134,10 @@ func (h *OrderHandler) Checkout(c *gin.Context) {
 //	@Router			/api/v1/orders [get]
 func (h *OrderHandler) List(c *gin.Context) {
 	q := response.NewQueryParser(c)
-	query := usecase.ListOrdersQuery{
+	query := domain.ListOrdersQuery{
 		UserID:      q.UUID("user_id"),
 		Status:      domain.OrderStatus(c.Query("status")),
-		PageRequest: usecase.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")},
+		PageRequest: domain.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")},
 	}
 	if err := q.Err(); err != nil {
 		response.Error(c, err)

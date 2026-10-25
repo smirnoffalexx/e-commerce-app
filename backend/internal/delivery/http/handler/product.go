@@ -8,7 +8,6 @@ import (
 	"e-commerce-backend/internal/delivery/http/dto"
 	"e-commerce-backend/internal/delivery/http/response"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 type ProductHandler struct {
@@ -50,14 +49,14 @@ func (h *ProductHandler) Register(r gin.IRouter, write ...gin.HandlerFunc) {
 //	@Router			/api/v1/products [get]
 func (h *ProductHandler) List(c *gin.Context) {
 	q := response.NewQueryParser(c)
-	query := usecase.ListProductsQuery{
+	query := domain.ListProductsQuery{
 		Query:       c.Query("q"),
 		CategoryID:  q.UUID("category_id"),
 		MinPrice:    q.Decimal("min_price"),
 		MaxPrice:    q.Decimal("max_price"),
 		InStock:     q.Bool("in_stock"),
 		Sort:        domain.ProductSort(c.Query("sort")),
-		PageRequest: usecase.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")},
+		PageRequest: domain.PageRequest{Page: q.Int("page"), PageSize: q.Int("page_size")},
 	}
 	if err := q.Err(); err != nil {
 		response.Error(c, err)

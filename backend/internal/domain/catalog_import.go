@@ -1,10 +1,6 @@
-package usecase
+package domain
 
-import (
-	"io"
-
-	"github.com/shopspring/decimal"
-)
+import "github.com/shopspring/decimal"
 
 type ImportMode string
 
@@ -42,10 +38,6 @@ type ParsedCatalog struct {
 	Errors    []ImportRowError
 	DataRows  int
 	BlankRows int
-}
-
-type CatalogParser interface {
-	Parse(r io.Reader) (ParsedCatalog, error)
 }
 
 type ImportOptions struct {

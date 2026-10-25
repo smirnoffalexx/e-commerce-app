@@ -31,7 +31,7 @@ func seedDemoCatalog(ctx context.Context, log *slog.Logger, path string, product
 	}
 	defer func() { _ = f.Close() }()
 
-	report, err := importer.Import(ctx, f, usecase.ImportOptions{Mode: usecase.ImportModeUpsert, CreateMissingCategories: true})
+	report, err := importer.Import(ctx, f, domain.ImportOptions{Mode: domain.ImportModeUpsert, CreateMissingCategories: true})
 	if err != nil {
 		return err
 	}

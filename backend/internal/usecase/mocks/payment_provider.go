@@ -6,7 +6,7 @@ package mocks
 
 import (
 	"context"
-	"e-commerce-backend/internal/usecase"
+	"e-commerce-backend/internal/domain"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -48,24 +48,24 @@ func (_m *PaymentProvider) EXPECT() *PaymentProvider_Expecter {
 }
 
 // Charge provides a mock function for the type PaymentProvider
-func (_mock *PaymentProvider) Charge(ctx context.Context, req usecase.PaymentRequest) (usecase.PaymentResult, error) {
+func (_mock *PaymentProvider) Charge(ctx context.Context, req domain.PaymentRequest) (domain.PaymentResult, error) {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Charge")
 	}
 
-	var r0 usecase.PaymentResult
+	var r0 domain.PaymentResult
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.PaymentRequest) (usecase.PaymentResult, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.PaymentRequest) (domain.PaymentResult, error)); ok {
 		return returnFunc(ctx, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, usecase.PaymentRequest) usecase.PaymentResult); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.PaymentRequest) domain.PaymentResult); ok {
 		r0 = returnFunc(ctx, req)
 	} else {
-		r0 = ret.Get(0).(usecase.PaymentResult)
+		r0 = ret.Get(0).(domain.PaymentResult)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, usecase.PaymentRequest) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.PaymentRequest) error); ok {
 		r1 = returnFunc(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -80,20 +80,20 @@ type PaymentProvider_Charge_Call struct {
 
 // Charge is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req usecase.PaymentRequest
+//   - req domain.PaymentRequest
 func (_e *PaymentProvider_Expecter) Charge(ctx any, req any) *PaymentProvider_Charge_Call {
 	return &PaymentProvider_Charge_Call{Call: _e.mock.On("Charge", ctx, req)}
 }
 
-func (_c *PaymentProvider_Charge_Call) Run(run func(ctx context.Context, req usecase.PaymentRequest)) *PaymentProvider_Charge_Call {
+func (_c *PaymentProvider_Charge_Call) Run(run func(ctx context.Context, req domain.PaymentRequest)) *PaymentProvider_Charge_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 usecase.PaymentRequest
+		var arg1 domain.PaymentRequest
 		if args[1] != nil {
-			arg1 = args[1].(usecase.PaymentRequest)
+			arg1 = args[1].(domain.PaymentRequest)
 		}
 		run(
 			arg0,
@@ -103,12 +103,12 @@ func (_c *PaymentProvider_Charge_Call) Run(run func(ctx context.Context, req use
 	return _c
 }
 
-func (_c *PaymentProvider_Charge_Call) Return(paymentResult usecase.PaymentResult, err error) *PaymentProvider_Charge_Call {
+func (_c *PaymentProvider_Charge_Call) Return(paymentResult domain.PaymentResult, err error) *PaymentProvider_Charge_Call {
 	_c.Call.Return(paymentResult, err)
 	return _c
 }
 
-func (_c *PaymentProvider_Charge_Call) RunAndReturn(run func(ctx context.Context, req usecase.PaymentRequest) (usecase.PaymentResult, error)) *PaymentProvider_Charge_Call {
+func (_c *PaymentProvider_Charge_Call) RunAndReturn(run func(ctx context.Context, req domain.PaymentRequest) (domain.PaymentResult, error)) *PaymentProvider_Charge_Call {
 	_c.Call.Return(run)
 	return _c
 }

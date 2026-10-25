@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 type CreateAdminRequest struct {
@@ -25,7 +24,7 @@ type UserListResponse struct {
 	TotalPages int            `json:"total_pages" example:"1"`
 }
 
-func NewAdminCredentialsResponse(c *usecase.AdminCredentials) AdminCredentialsResponse {
+func NewAdminCredentialsResponse(c *domain.AdminCredentials) AdminCredentialsResponse {
 	return AdminCredentialsResponse{
 		User:                       NewUserResponse(&c.User),
 		TemporaryPassword:          c.TemporaryPassword,
@@ -33,7 +32,7 @@ func NewAdminCredentialsResponse(c *usecase.AdminCredentials) AdminCredentialsRe
 	}
 }
 
-func NewUserListResponse(page *usecase.Page[domain.User]) UserListResponse {
+func NewUserListResponse(page *domain.Page[domain.User]) UserListResponse {
 	items := make([]UserResponse, 0, len(page.Items))
 	for i := range page.Items {
 		items = append(items, NewUserResponse(&page.Items[i]))

@@ -74,15 +74,15 @@ func TestProductService_List(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		query      usecase.ListProductsQuery
+		query      domain.ListProductsQuery
 		wantLimit  int
 		wantOffset int
 		wantPage   int
 	}{
-		{"defaults", usecase.ListProductsQuery{}, usecase.DefaultPageSize, 0, 1},
-		{"explicit page", usecase.ListProductsQuery{PageRequest: usecase.PageRequest{Page: 3, PageSize: 10}}, 10, 20, 3},
-		{"max page size", usecase.ListProductsQuery{PageRequest: usecase.PageRequest{PageSize: usecase.MaxPageSize}}, usecase.MaxPageSize, 0, 1},
-		{"with category", usecase.ListProductsQuery{CategoryID: &categoryID}, usecase.DefaultPageSize, 0, 1},
+		{"defaults", domain.ListProductsQuery{}, domain.DefaultPageSize, 0, 1},
+		{"explicit page", domain.ListProductsQuery{PageRequest: domain.PageRequest{Page: 3, PageSize: 10}}, 10, 20, 3},
+		{"max page size", domain.ListProductsQuery{PageRequest: domain.PageRequest{PageSize: domain.MaxPageSize}}, domain.MaxPageSize, 0, 1},
+		{"with category", domain.ListProductsQuery{CategoryID: &categoryID}, domain.DefaultPageSize, 0, 1},
 	}
 
 	for _, tc := range cases {
@@ -105,27 +105,27 @@ func TestProductService_List(t *testing.T) {
 }
 
 func TestProductService_List_RejectsInvalidPaging(t *testing.T) {
-	cases := map[string]usecase.PageRequest{
+	cases := map[string]domain.PageRequest{
 		"negative page":      {Page: -1},
-		"page too large":     {Page: usecase.MaxPage + 1},
+		"page too large":     {Page: domain.MaxPage + 1},
 		"negative page size": {PageSize: -10},
-		"page size too big":  {PageSize: usecase.MaxPageSize + 1},
+		"page size too big":  {PageSize: domain.MaxPageSize + 1},
 	}
 
 	for name, req := range cases {
 		t.Run(name, func(t *testing.T) {
 			repo := mocks.NewProductRepository(t)
 
-			_, err := usecase.NewProductService(repo).List(context.Background(), usecase.ListProductsQuery{PageRequest: req})
+			_, err := usecase.NewProductService(repo).List(context.Background(), domain.ListProductsQuery{PageRequest: req})
 			assert.ErrorIs(t, err, domain.ErrValidation)
 		})
 	}
 }
 
 func TestPage_TotalPages(t *testing.T) {
-	assert.Equal(t, 0, usecase.Page[int]{Total: 0, PageSize: 20}.TotalPages())
-	assert.Equal(t, 1, usecase.Page[int]{Total: 20, PageSize: 20}.TotalPages())
-	assert.Equal(t, 3, usecase.Page[int]{Total: 41, PageSize: 20}.TotalPages())
+	assert.Equal(t, 0, domain.Page[int]{Total: 0, PageSize: 20}.TotalPages())
+	assert.Equal(t, 1, domain.Page[int]{Total: 20, PageSize: 20}.TotalPages())
+	assert.Equal(t, 3, domain.Page[int]{Total: 41, PageSize: 20}.TotalPages())
 }
 
 func TestProductService_Update(t *testing.T) {

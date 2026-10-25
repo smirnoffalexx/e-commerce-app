@@ -7,7 +7,6 @@ package mocks
 import (
 	"context"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
@@ -50,22 +49,22 @@ func (_m *AuthService) EXPECT() *AuthService_Expecter {
 }
 
 // ChangePassword provides a mock function for the type AuthService
-func (_mock *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, current string, next string) (usecase.Session, error) {
+func (_mock *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, current string, next string) (domain.Session, error) {
 	ret := _mock.Called(ctx, userID, current, next)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ChangePassword")
 	}
 
-	var r0 usecase.Session
+	var r0 domain.Session
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string) (usecase.Session, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string) (domain.Session, error)); ok {
 		return returnFunc(ctx, userID, current, next)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string) usecase.Session); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string) domain.Session); ok {
 		r0 = returnFunc(ctx, userID, current, next)
 	} else {
-		r0 = ret.Get(0).(usecase.Session)
+		r0 = ret.Get(0).(domain.Session)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, string, string) error); ok {
 		r1 = returnFunc(ctx, userID, current, next)
@@ -117,33 +116,33 @@ func (_c *AuthService_ChangePassword_Call) Run(run func(ctx context.Context, use
 	return _c
 }
 
-func (_c *AuthService_ChangePassword_Call) Return(session usecase.Session, err error) *AuthService_ChangePassword_Call {
+func (_c *AuthService_ChangePassword_Call) Return(session domain.Session, err error) *AuthService_ChangePassword_Call {
 	_c.Call.Return(session, err)
 	return _c
 }
 
-func (_c *AuthService_ChangePassword_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, current string, next string) (usecase.Session, error)) *AuthService_ChangePassword_Call {
+func (_c *AuthService_ChangePassword_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, current string, next string) (domain.Session, error)) *AuthService_ChangePassword_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Login provides a mock function for the type AuthService
-func (_mock *AuthService) Login(ctx context.Context, email string, password string) (usecase.Session, error) {
+func (_mock *AuthService) Login(ctx context.Context, email string, password string) (domain.Session, error) {
 	ret := _mock.Called(ctx, email, password)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Login")
 	}
 
-	var r0 usecase.Session
+	var r0 domain.Session
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (usecase.Session, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (domain.Session, error)); ok {
 		return returnFunc(ctx, email, password)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) usecase.Session); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) domain.Session); ok {
 		r0 = returnFunc(ctx, email, password)
 	} else {
-		r0 = ret.Get(0).(usecase.Session)
+		r0 = ret.Get(0).(domain.Session)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = returnFunc(ctx, email, password)
@@ -189,12 +188,12 @@ func (_c *AuthService_Login_Call) Run(run func(ctx context.Context, email string
 	return _c
 }
 
-func (_c *AuthService_Login_Call) Return(session usecase.Session, err error) *AuthService_Login_Call {
+func (_c *AuthService_Login_Call) Return(session domain.Session, err error) *AuthService_Login_Call {
 	_c.Call.Return(session, err)
 	return _c
 }
 
-func (_c *AuthService_Login_Call) RunAndReturn(run func(ctx context.Context, email string, password string) (usecase.Session, error)) *AuthService_Login_Call {
+func (_c *AuthService_Login_Call) RunAndReturn(run func(ctx context.Context, email string, password string) (domain.Session, error)) *AuthService_Login_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -323,22 +322,22 @@ func (_c *AuthService_Me_Call) RunAndReturn(run func(ctx context.Context, userID
 }
 
 // Refresh provides a mock function for the type AuthService
-func (_mock *AuthService) Refresh(ctx context.Context, refreshToken string) (usecase.Session, error) {
+func (_mock *AuthService) Refresh(ctx context.Context, refreshToken string) (domain.Session, error) {
 	ret := _mock.Called(ctx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Refresh")
 	}
 
-	var r0 usecase.Session
+	var r0 domain.Session
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (usecase.Session, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (domain.Session, error)); ok {
 		return returnFunc(ctx, refreshToken)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) usecase.Session); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) domain.Session); ok {
 		r0 = returnFunc(ctx, refreshToken)
 	} else {
-		r0 = ret.Get(0).(usecase.Session)
+		r0 = ret.Get(0).(domain.Session)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, refreshToken)
@@ -378,12 +377,12 @@ func (_c *AuthService_Refresh_Call) Run(run func(ctx context.Context, refreshTok
 	return _c
 }
 
-func (_c *AuthService_Refresh_Call) Return(session usecase.Session, err error) *AuthService_Refresh_Call {
+func (_c *AuthService_Refresh_Call) Return(session domain.Session, err error) *AuthService_Refresh_Call {
 	_c.Call.Return(session, err)
 	return _c
 }
 
-func (_c *AuthService_Refresh_Call) RunAndReturn(run func(ctx context.Context, refreshToken string) (usecase.Session, error)) *AuthService_Refresh_Call {
+func (_c *AuthService_Refresh_Call) RunAndReturn(run func(ctx context.Context, refreshToken string) (domain.Session, error)) *AuthService_Refresh_Call {
 	_c.Call.Return(run)
 	return _c
 }

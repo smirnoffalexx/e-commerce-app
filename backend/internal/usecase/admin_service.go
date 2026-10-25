@@ -12,12 +12,6 @@ import (
 
 const TempPasswordTTL = 24 * time.Hour
 
-type AdminCredentials struct {
-	User                       domain.User
-	TemporaryPassword          string
-	TemporaryPasswordExpiresAt time.Time
-}
-
 type AdminService struct {
 	users     UserRepository
 	hasher    PasswordHasher
@@ -35,53 +29,53 @@ func (s *AdminService) WithClock(now func() time.Time) *AdminService {
 	return s
 }
 
-func (s *AdminService) Create(ctx context.Context, email string) (AdminCredentials, error) {
+func (s *AdminService) Create(ctx context.Context, email string) (domain.AdminCredentials, error) {
 	if err := domain.ValidateEmail(email); err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 
 	u, err := domain.NewUser(email, "", domain.RoleAdmin)
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	creds, err := s.assignTemporaryPassword(&u)
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	if err := s.users.Create(ctx, &u); err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	creds.User = u
 	return creds, nil
 }
 
-func (s *AdminService) List(ctx context.Context, req PageRequest) (Page[domain.User], error) {
-	page, err := req.normalize()
+func (s *AdminService) List(ctx context.Context, req domain.PageRequest) (domain.Page[domain.User], error) {
+	page, err := req.Normalize()
 	if err != nil {
-		return Page[domain.User]{}, err
+		return domain.Page[domain.User]{}, err
 	}
-	items, total, err := s.users.ListByRole(ctx, domain.RoleAdmin, page.PageSize, page.offset())
+	items, total, err := s.users.ListByRole(ctx, domain.RoleAdmin, page.PageSize, page.Offset())
 	if err != nil {
-		return Page[domain.User]{}, err
+		return domain.Page[domain.User]{}, err
 	}
-	return Page[domain.User]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
+	return domain.Page[domain.User]{Items: items, Total: total, Page: page.Page, PageSize: page.PageSize}, nil
 }
 
-func (s *AdminService) ResetPassword(ctx context.Context, id uuid.UUID) (AdminCredentials, error) {
+func (s *AdminService) ResetPassword(ctx context.Context, id uuid.UUID) (domain.AdminCredentials, error) {
 	u, err := s.getAdmin(ctx, id)
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 
 	creds, err := s.assignTemporaryPassword(&u)
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	if err := s.users.Update(ctx, &u); err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	if err := s.refresh.RevokeAll(ctx, u.ID); err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	creds.User = u
 	return creds, nil
@@ -116,16 +110,16 @@ func (s *AdminService) getAdmin(ctx context.Context, id uuid.UUID) (domain.User,
 	return u, err
 }
 
-func (s *AdminService) assignTemporaryPassword(u *domain.User) (AdminCredentials, error) {
+func (s *AdminService) assignTemporaryPassword(u *domain.User) (domain.AdminCredentials, error) {
 	password, err := s.passwords.Generate()
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	hash, err := s.hasher.Hash(password)
 	if err != nil {
-		return AdminCredentials{}, err
+		return domain.AdminCredentials{}, err
 	}
 	expiresAt := s.now().Add(TempPasswordTTL).UTC()
 	u.SetTemporaryPassword(hash, expiresAt)
-	return AdminCredentials{TemporaryPassword: password, TemporaryPasswordExpiresAt: expiresAt}, nil
+	return domain.AdminCredentials{TemporaryPassword: password, TemporaryPasswordExpiresAt: expiresAt}, nil
 }

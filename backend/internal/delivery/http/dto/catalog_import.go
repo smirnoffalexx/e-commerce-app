@@ -1,6 +1,8 @@
 package dto
 
-import "e-commerce-backend/internal/usecase"
+import (
+	"e-commerce-backend/internal/domain"
+)
 
 type ImportRowErrorResponse struct {
 	Line    int    `json:"line" example:"7"`
@@ -33,7 +35,7 @@ type ImportReportResponse struct {
 	Errors                  []ImportRowErrorResponse  `json:"errors"`
 }
 
-func NewImportReportResponse(r *usecase.ImportReport) ImportReportResponse {
+func NewImportReportResponse(r *domain.ImportReport) ImportReportResponse {
 	resp := ImportReportResponse{
 		Mode:                    string(r.Options.Mode),
 		DryRun:                  r.Options.DryRun,

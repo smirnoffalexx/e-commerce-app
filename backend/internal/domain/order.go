@@ -282,3 +282,27 @@ type OrderFilter struct {
 	Limit  int
 	Offset int
 }
+
+type CheckoutResult struct {
+	Order    Order
+	Replayed bool
+}
+
+type ListOrdersQuery struct {
+	UserID *uuid.UUID
+	Status OrderStatus
+	PageRequest
+}
+
+func (q ListOrdersQuery) Filter() (OrderFilter, PageRequest, error) {
+	var verr ValidationError
+	page, err := q.Normalize()
+	verr.Merge(err)
+	if q.Status != "" && !q.Status.Valid() {
+		verr.Add("status", CodeInvalidFormat, "status must be one of PENDING, PAID, FAILED")
+	}
+	if err := verr.Err(); err != nil {
+		return OrderFilter{}, PageRequest{}, err
+	}
+	return OrderFilter{UserID: q.UserID, Status: q.Status, Limit: page.PageSize, Offset: page.Offset()}, page, nil
+}

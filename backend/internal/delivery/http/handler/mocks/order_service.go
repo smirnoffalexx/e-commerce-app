@@ -7,7 +7,6 @@ package mocks
 import (
 	"context"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
@@ -50,22 +49,22 @@ func (_m *OrderService) EXPECT() *OrderService_Expecter {
 }
 
 // Checkout provides a mock function for the type OrderService
-func (_mock *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (usecase.CheckoutResult, error) {
+func (_mock *OrderService) Checkout(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (domain.CheckoutResult, error) {
 	ret := _mock.Called(ctx, userID, in)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Checkout")
 	}
 
-	var r0 usecase.CheckoutResult
+	var r0 domain.CheckoutResult
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, domain.CheckoutInput) (usecase.CheckoutResult, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, domain.CheckoutInput) (domain.CheckoutResult, error)); ok {
 		return returnFunc(ctx, userID, in)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, domain.CheckoutInput) usecase.CheckoutResult); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, domain.CheckoutInput) domain.CheckoutResult); ok {
 		r0 = returnFunc(ctx, userID, in)
 	} else {
-		r0 = ret.Get(0).(usecase.CheckoutResult)
+		r0 = ret.Get(0).(domain.CheckoutResult)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, domain.CheckoutInput) error); ok {
 		r1 = returnFunc(ctx, userID, in)
@@ -111,12 +110,12 @@ func (_c *OrderService_Checkout_Call) Run(run func(ctx context.Context, userID u
 	return _c
 }
 
-func (_c *OrderService_Checkout_Call) Return(checkoutResult usecase.CheckoutResult, err error) *OrderService_Checkout_Call {
+func (_c *OrderService_Checkout_Call) Return(checkoutResult domain.CheckoutResult, err error) *OrderService_Checkout_Call {
 	_c.Call.Return(checkoutResult, err)
 	return _c
 }
 
-func (_c *OrderService_Checkout_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (usecase.CheckoutResult, error)) *OrderService_Checkout_Call {
+func (_c *OrderService_Checkout_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, in domain.CheckoutInput) (domain.CheckoutResult, error)) *OrderService_Checkout_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -194,24 +193,24 @@ func (_c *OrderService_Get_Call) RunAndReturn(run func(ctx context.Context, view
 }
 
 // List provides a mock function for the type OrderService
-func (_mock *OrderService) List(ctx context.Context, viewer domain.Principal, q usecase.ListOrdersQuery) (usecase.Page[domain.Order], error) {
+func (_mock *OrderService) List(ctx context.Context, viewer domain.Principal, q domain.ListOrdersQuery) (domain.Page[domain.Order], error) {
 	ret := _mock.Called(ctx, viewer, q)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
 	}
 
-	var r0 usecase.Page[domain.Order]
+	var r0 domain.Page[domain.Order]
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Principal, usecase.ListOrdersQuery) (usecase.Page[domain.Order], error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Principal, domain.ListOrdersQuery) (domain.Page[domain.Order], error)); ok {
 		return returnFunc(ctx, viewer, q)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Principal, usecase.ListOrdersQuery) usecase.Page[domain.Order]); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Principal, domain.ListOrdersQuery) domain.Page[domain.Order]); ok {
 		r0 = returnFunc(ctx, viewer, q)
 	} else {
-		r0 = ret.Get(0).(usecase.Page[domain.Order])
+		r0 = ret.Get(0).(domain.Page[domain.Order])
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.Principal, usecase.ListOrdersQuery) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.Principal, domain.ListOrdersQuery) error); ok {
 		r1 = returnFunc(ctx, viewer, q)
 	} else {
 		r1 = ret.Error(1)
@@ -227,12 +226,12 @@ type OrderService_List_Call struct {
 // List is a helper method to define mock.On call
 //   - ctx context.Context
 //   - viewer domain.Principal
-//   - q usecase.ListOrdersQuery
+//   - q domain.ListOrdersQuery
 func (_e *OrderService_Expecter) List(ctx any, viewer any, q any) *OrderService_List_Call {
 	return &OrderService_List_Call{Call: _e.mock.On("List", ctx, viewer, q)}
 }
 
-func (_c *OrderService_List_Call) Run(run func(ctx context.Context, viewer domain.Principal, q usecase.ListOrdersQuery)) *OrderService_List_Call {
+func (_c *OrderService_List_Call) Run(run func(ctx context.Context, viewer domain.Principal, q domain.ListOrdersQuery)) *OrderService_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -242,9 +241,9 @@ func (_c *OrderService_List_Call) Run(run func(ctx context.Context, viewer domai
 		if args[1] != nil {
 			arg1 = args[1].(domain.Principal)
 		}
-		var arg2 usecase.ListOrdersQuery
+		var arg2 domain.ListOrdersQuery
 		if args[2] != nil {
-			arg2 = args[2].(usecase.ListOrdersQuery)
+			arg2 = args[2].(domain.ListOrdersQuery)
 		}
 		run(
 			arg0,
@@ -255,12 +254,12 @@ func (_c *OrderService_List_Call) Run(run func(ctx context.Context, viewer domai
 	return _c
 }
 
-func (_c *OrderService_List_Call) Return(page usecase.Page[domain.Order], err error) *OrderService_List_Call {
+func (_c *OrderService_List_Call) Return(page domain.Page[domain.Order], err error) *OrderService_List_Call {
 	_c.Call.Return(page, err)
 	return _c
 }
 
-func (_c *OrderService_List_Call) RunAndReturn(run func(ctx context.Context, viewer domain.Principal, q usecase.ListOrdersQuery) (usecase.Page[domain.Order], error)) *OrderService_List_Call {
+func (_c *OrderService_List_Call) RunAndReturn(run func(ctx context.Context, viewer domain.Principal, q domain.ListOrdersQuery) (domain.Page[domain.Order], error)) *OrderService_List_Call {
 	_c.Call.Return(run)
 	return _c
 }

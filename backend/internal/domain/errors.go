@@ -66,3 +66,10 @@ func (e *ValidationError) Err() error {
 	}
 	return e
 }
+
+func (e *ValidationError) Merge(err error) {
+	var verr *ValidationError
+	if errors.As(err, &verr) {
+		e.Fields = append(e.Fields, verr.Fields...)
+	}
+}

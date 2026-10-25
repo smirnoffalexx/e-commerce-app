@@ -1,6 +1,4 @@
-package usecase
-
-import "e-commerce-backend/internal/domain"
+package domain
 
 const (
 	DefaultPageSize = 20
@@ -13,7 +11,7 @@ type PageRequest struct {
 	PageSize int
 }
 
-func (r PageRequest) normalize() (PageRequest, error) {
+func (r PageRequest) Normalize() (PageRequest, error) {
 	if r.Page == 0 {
 		r.Page = 1
 	}
@@ -21,17 +19,17 @@ func (r PageRequest) normalize() (PageRequest, error) {
 		r.PageSize = DefaultPageSize
 	}
 
-	var verr domain.ValidationError
+	var verr ValidationError
 	if r.Page < 1 || r.Page > MaxPage {
-		verr.Add("page", domain.CodeInvalidFormat, "page must be between 1 and 10000")
+		verr.Add("page", CodeInvalidFormat, "page must be between 1 and 10000")
 	}
 	if r.PageSize < 1 || r.PageSize > MaxPageSize {
-		verr.Add("page_size", domain.CodeInvalidFormat, "page_size must be between 1 and 100")
+		verr.Add("page_size", CodeInvalidFormat, "page_size must be between 1 and 100")
 	}
 	return r, verr.Err()
 }
 
-func (r PageRequest) offset() int {
+func (r PageRequest) Offset() int {
 	return (r.Page - 1) * r.PageSize
 }
 

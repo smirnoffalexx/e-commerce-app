@@ -25,7 +25,6 @@ import (
 	"e-commerce-backend/internal/delivery/http/handler/mocks"
 	"e-commerce-backend/internal/delivery/http/response"
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 func init() {
@@ -299,8 +298,8 @@ func TestPathAndQueryErrors(t *testing.T) {
 		api := newTestAPI(t)
 		verr := &domain.ValidationError{}
 		verr.Add("page_size", domain.CodeInvalidFormat, "page_size must be between 1 and 100")
-		api.products.EXPECT().List(mock.Anything, usecase.ListProductsQuery{PageRequest: usecase.PageRequest{PageSize: 1000}}).
-			Return(usecase.Page[domain.Product]{}, verr)
+		api.products.EXPECT().List(mock.Anything, domain.ListProductsQuery{PageRequest: domain.PageRequest{PageSize: 1000}}).
+			Return(domain.Page[domain.Product]{}, verr)
 
 		w := api.do(http.MethodGet, "/api/v1/products?page_size=1000", "")
 		require.Equal(t, http.StatusUnprocessableEntity, w.Code)
@@ -400,7 +399,7 @@ func TestTemporaryPasswordAllowsOnlyAccountEndpoints(t *testing.T) {
 
 func TestLogin_InvalidCredentialsIs401(t *testing.T) {
 	api := newTestAPI(t)
-	api.auth.EXPECT().Login(mock.Anything, "jane@example.com", "wrong-password").Return(usecase.Session{}, domain.ErrInvalidCredentials)
+	api.auth.EXPECT().Login(mock.Anything, "jane@example.com", "wrong-password").Return(domain.Session{}, domain.ErrInvalidCredentials)
 
 	w := api.do(http.MethodPost, "/api/v1/auth/login", `{"email":"jane@example.com","password":"wrong-password"}`, "Authorization", "")
 	require.Equal(t, http.StatusUnauthorized, w.Code)
@@ -429,7 +428,7 @@ func TestAdminEndpoints_OnlySuperAdmin(t *testing.T) {
 
 func TestCreateAdmin_ResponseIsNotCached(t *testing.T) {
 	api := newTestAPI(t)
-	api.admins.EXPECT().Create(mock.Anything, "a@example.com").Return(usecase.AdminCredentials{
+	api.admins.EXPECT().Create(mock.Anything, "a@example.com").Return(domain.AdminCredentials{
 		User:              domain.User{ID: uuid.Must(uuid.NewV7()), Email: "a@example.com", Role: domain.RoleAdmin, MustChangePassword: true},
 		TemporaryPassword: "Kd7mQx2RtLp9WzHn",
 	}, nil)
@@ -467,13 +466,13 @@ func (a *testAPI) upload(path, filename string, content []byte, token string, t 
 
 func TestImport_PassesOptionsAndReturnsReport(t *testing.T) {
 	api := newTestAPI(t)
-	api.imports.EXPECT().Import(mock.Anything, mock.Anything, usecase.ImportOptions{
-		Mode: usecase.ImportModeSkip, DryRun: true, Atomic: true, CreateMissingCategories: true,
-	}).Return(usecase.ImportReport{
-		Options: usecase.ImportOptions{Mode: usecase.ImportModeSkip, DryRun: true},
+	api.imports.EXPECT().Import(mock.Anything, mock.Anything, domain.ImportOptions{
+		Mode: domain.ImportModeSkip, DryRun: true, Atomic: true, CreateMissingCategories: true,
+	}).Return(domain.ImportReport{
+		Options: domain.ImportOptions{Mode: domain.ImportModeSkip, DryRun: true},
 		Created: 2,
 		Failed:  1,
-		Errors:  []usecase.ImportRowError{{Line: 7, SKU: "YM-015", Field: "price", Code: "invalid_format", Message: "bad"}},
+		Errors:  []domain.ImportRowError{{Line: 7, SKU: "YM-015", Field: "price", Code: "invalid_format", Message: "bad"}},
 	}, nil)
 
 	w := api.upload("/api/v1/products/import?mode=skip&dry_run=true&atomic=1&create_missing_categories=true", "catalog.CSV", []byte("x"), "admin", t)

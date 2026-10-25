@@ -8,7 +8,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	"e-commerce-backend/internal/domain"
-	"e-commerce-backend/internal/usecase"
 )
 
 type CheckoutRequest struct {
@@ -113,7 +112,7 @@ func NewOrderResponse(o *domain.Order) OrderResponse {
 	}
 }
 
-func NewOrderListResponse(page *usecase.Page[domain.Order]) OrderListResponse {
+func NewOrderListResponse(page *domain.Page[domain.Order]) OrderListResponse {
 	items := make([]OrderResponse, 0, len(page.Items))
 	for i := range page.Items {
 		items = append(items, NewOrderResponse(&page.Items[i]))

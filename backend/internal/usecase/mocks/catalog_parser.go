@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"e-commerce-backend/internal/usecase"
+	"e-commerce-backend/internal/domain"
 	"io"
 
 	mock "github.com/stretchr/testify/mock"
@@ -48,22 +48,22 @@ func (_m *CatalogParser) EXPECT() *CatalogParser_Expecter {
 }
 
 // Parse provides a mock function for the type CatalogParser
-func (_mock *CatalogParser) Parse(r io.Reader) (usecase.ParsedCatalog, error) {
+func (_mock *CatalogParser) Parse(r io.Reader) (domain.ParsedCatalog, error) {
 	ret := _mock.Called(r)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Parse")
 	}
 
-	var r0 usecase.ParsedCatalog
+	var r0 domain.ParsedCatalog
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(io.Reader) (usecase.ParsedCatalog, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(io.Reader) (domain.ParsedCatalog, error)); ok {
 		return returnFunc(r)
 	}
-	if returnFunc, ok := ret.Get(0).(func(io.Reader) usecase.ParsedCatalog); ok {
+	if returnFunc, ok := ret.Get(0).(func(io.Reader) domain.ParsedCatalog); ok {
 		r0 = returnFunc(r)
 	} else {
-		r0 = ret.Get(0).(usecase.ParsedCatalog)
+		r0 = ret.Get(0).(domain.ParsedCatalog)
 	}
 	if returnFunc, ok := ret.Get(1).(func(io.Reader) error); ok {
 		r1 = returnFunc(r)
@@ -97,12 +97,12 @@ func (_c *CatalogParser_Parse_Call) Run(run func(r io.Reader)) *CatalogParser_Pa
 	return _c
 }
 
-func (_c *CatalogParser_Parse_Call) Return(parsedCatalog usecase.ParsedCatalog, err error) *CatalogParser_Parse_Call {
+func (_c *CatalogParser_Parse_Call) Return(parsedCatalog domain.ParsedCatalog, err error) *CatalogParser_Parse_Call {
 	_c.Call.Return(parsedCatalog, err)
 	return _c
 }
 
-func (_c *CatalogParser_Parse_Call) RunAndReturn(run func(r io.Reader) (usecase.ParsedCatalog, error)) *CatalogParser_Parse_Call {
+func (_c *CatalogParser_Parse_Call) RunAndReturn(run func(r io.Reader) (domain.ParsedCatalog, error)) *CatalogParser_Parse_Call {
 	_c.Call.Return(run)
 	return _c
 }

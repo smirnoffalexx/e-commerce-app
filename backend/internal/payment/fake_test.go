@@ -13,8 +13,8 @@ import (
 	"e-commerce-backend/internal/usecase"
 )
 
-func charge(ctx context.Context, number string) (usecase.PaymentResult, error) {
-	return payment.NewFakeProvider().Charge(ctx, usecase.PaymentRequest{
+func charge(ctx context.Context, number string) (domain.PaymentResult, error) {
+	return payment.NewFakeProvider().Charge(ctx, domain.PaymentRequest{
 		IdempotencyKey: "order-1",
 		Amount:         decimal.RequireFromString("10.00"),
 		Card:           domain.Card{Number: number},
@@ -26,7 +26,7 @@ func TestFakeProvider_IsDeterministicByCardNumber(t *testing.T) {
 
 	res, err := charge(ctx, "4242 4242 4242 4242")
 	require.NoError(t, err)
-	assert.Equal(t, usecase.PaymentResult{Approved: true, PaymentID: "fake_order-1"}, res)
+	assert.Equal(t, domain.PaymentResult{Approved: true, PaymentID: "fake_order-1"}, res)
 
 	again, err := charge(ctx, "4242424242424242")
 	require.NoError(t, err)
@@ -34,11 +34,11 @@ func TestFakeProvider_IsDeterministicByCardNumber(t *testing.T) {
 
 	res, err = charge(ctx, "4000 0000 0000 0002")
 	require.NoError(t, err)
-	assert.Equal(t, usecase.PaymentResult{DeclineCode: domain.FailureCardDeclined}, res)
+	assert.Equal(t, domain.PaymentResult{DeclineCode: domain.FailureCardDeclined}, res)
 
 	res, err = charge(ctx, "4000000000009995")
 	require.NoError(t, err)
-	assert.Equal(t, usecase.PaymentResult{DeclineCode: "insufficient_funds"}, res)
+	assert.Equal(t, domain.PaymentResult{DeclineCode: "insufficient_funds"}, res)
 
 	_, err = charge(ctx, "4000-0000-0000-0119")
 	assert.ErrorIs(t, err, usecase.ErrPaymentTimeout)

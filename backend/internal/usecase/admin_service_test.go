@@ -179,7 +179,7 @@ func TestAdminService_List(t *testing.T) {
 	d := newAdmins(t)
 	d.users.EXPECT().ListByRole(mock.Anything, domain.RoleAdmin, 10, 10).Return([]domain.User{}, 11, nil)
 
-	page, err := d.svc.List(context.Background(), usecase.PageRequest{Page: 2, PageSize: 10})
+	page, err := d.svc.List(context.Background(), domain.PageRequest{Page: 2, PageSize: 10})
 	require.NoError(t, err)
 	assert.Equal(t, 2, page.TotalPages())
 }
