@@ -179,7 +179,7 @@ func (r *OrderRepository) CommitStock(ctx context.Context, items []domain.OrderI
 // settleReserve drops the reservation of each item. On commit the units also leave
 // stock and the version is bumped, so an admin edit based on the old stock is stale.
 func (r *OrderRepository) settleReserve(ctx context.Context, items []domain.OrderItem, commit bool) error {
-	db := conn(ctx, r.db).Unscoped()
+	db := conn(ctx, r.db)
 	for _, it := range items {
 		changes := map[string]any{"reserved": gorm.Expr("reserved - ?", it.Quantity)}
 		if commit {
@@ -187,7 +187,8 @@ func (r *OrderRepository) settleReserve(ctx context.Context, items []domain.Orde
 			changes["version"] = gorm.Expr("version + 1")
 			changes["updated_at"] = gorm.Expr("now()")
 		}
-		if err := db.Model(&productModel{}).Where("id = ?", it.ProductID).Updates(changes).Error; err != nil {
+		// Unscoped returns a chain that shares its statement, so it must not be reused across iterations.
+		if err := db.Unscoped().Model(&productModel{}).Where("id = ?", it.ProductID).Updates(changes).Error; err != nil {
 			return fmt.Errorf("settle reserved stock: %w", err)
 		}
 	}
