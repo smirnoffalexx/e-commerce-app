@@ -74,8 +74,13 @@ func Run(ctx context.Context, cfg config.Config) error {
 		categories,
 		products,
 	)
-	if err := seedDemoCatalog(ctx, log, cfg.SeedDemoFile, products, importService); err != nil {
-		return fmt.Errorf("seed demo catalog: %w", err)
+	switch {
+	case cfg.IsProduction() && cfg.SeedDemoFile != "":
+		log.Warn("demo catalog skipped in production", slog.String("file", cfg.SeedDemoFile))
+	case !cfg.IsProduction():
+		if err := seedDemoCatalog(ctx, log, cfg.SeedDemoFile, products, importService); err != nil {
+			return fmt.Errorf("seed demo catalog: %w", err)
+		}
 	}
 
 	orderService := usecase.NewOrderService(

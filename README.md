@@ -62,7 +62,7 @@ The image (`backend/Dockerfile`):
 - Healthcheck: BusyBox `wget` calls `/readyz` (PostgreSQL and Redis reachable); a 503 makes it fail. It is used both by the image `HEALTHCHECK` and by compose.
 - Alternative considered: `distroless/static` (no shell, about 5 MB smaller). It has no `wget` or `curl`, so the healthcheck would need extra Go code (a `healthcheck` subcommand or a separate binary) only for Docker; Alpine keeps the application code free of it.
 - Graceful shutdown: compose waits 20 s (`stop_grace_period`), longer than the server's 15 s shutdown timeout, so in-flight requests, including a checkout waiting for payment, finish.
-- In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode).
+- In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode). Production never imports the demo catalog, so the catalog starts empty and is filled by an admin; run `APP_ENV=development docker compose up` to get the demo data.
 
 The frontend image (`frontend/Dockerfile`):
 - Multi-stage on `node:24.22.1-alpine`: `npm ci` with a BuildKit cache, `next build` with `output: "standalone"`, and a runtime stage with only the standalone server, its traced dependencies (`next`, `react`, `react-dom`) and static assets, about 225 MB, most of it the Node.js base image.
@@ -130,7 +130,7 @@ The host ports can be changed with `POSTGRES_HOST_PORT` and `REDIS_HOST_PORT` in
 | `REDIS_ADDR` / `REDIS_PASSWORD` / `REDIS_DB` | `localhost:6380` / empty / `0` | |
 | `JWT_SECRET` | **required**, at least 32 bytes | No default on purpose, so a weak secret can never reach production |
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | empty | Creates the first superadmin once; an existing account is never modified |
-| `SEED_DEMO_FILE` | empty | CSV imported on start if the catalog is empty |
+| `SEED_DEMO_FILE` | empty | CSV imported on start if the catalog is empty; ignored when `APP_ENV=production` |
 | `TRUSTED_PROXIES` | empty; `172.31.250.10` in compose | Comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted: the frontend BFF |
 | `APP_ORIGIN`, `COOKIE_SECURE`, `FRONTEND_HOST_PORT` | `http://localhost:3000`, `false`, `3000` | Frontend settings used by compose, see [Running the frontend](#running-the-frontend) |
 
