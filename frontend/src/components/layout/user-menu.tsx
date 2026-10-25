@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRoundIcon, LogOutIcon, UserIcon } from "lucide-react";
+import { KeyRoundIcon, LogOutIcon, ReceiptIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -60,6 +60,14 @@ export function UserMenu({ user }: { user: User }) {
             Account
           </Link>
         </DropdownMenuItem>
+        {user.role === "USER" && (
+          <DropdownMenuItem asChild>
+            <Link href="/orders">
+              <ReceiptIcon />
+              Orders
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link href="/account/password">
             <KeyRoundIcon />

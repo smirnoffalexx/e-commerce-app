@@ -1,4 +1,4 @@
-import { CalendarIcon, KeyRoundIcon, MailIcon, ShieldIcon } from "lucide-react";
+import { CalendarIcon, KeyRoundIcon, MailIcon, ReceiptIcon, ShieldIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,15 @@ export default async function AccountPage() {
             <Detail icon={<CalendarIcon />} label="Member since" value={formatDate(user.created_at)} />
           </dl>
         </CardContent>
-        <CardFooter className="border-t">
+        <CardFooter className="gap-2 border-t">
+          {user.role === "USER" && (
+            <Button variant="outline" asChild>
+              <Link href="/orders">
+                <ReceiptIcon />
+                Order history
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <Link href="/account/password">
               <KeyRoundIcon />
