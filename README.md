@@ -6,6 +6,7 @@ A small but production-minded online store: product catalog with CRUD, CSV impor
 |---|---|---|
 | Backend | Go 1.27.3, Gin, GORM, PostgreSQL 18, Redis 8, Swagger | Catalog, search, CSV import, auth and roles, rate limiting, orders with a fake payment provider are done. Dockerfile, compose service and CI are done. |
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui | BFF with cookie sessions, sign-up, sign-in, account, catalog with search and filters, product page, cart, checkout, order history and the admin area (products, categories, CSV import with preview, all orders, administrators) are done. |
+| E2E | Playwright | Browser scenarios against the whole compose stack: catalog, auth, checkout, admin area. |
 
 Most of this document describes the backend; see [Frontend](#frontend) for the web app.
 
@@ -48,7 +49,7 @@ cp example.env .env
 docker compose up -d --build --wait
 ```
 
-This builds the backend and frontend images, starts PostgreSQL and Redis, applies migrations, starts the API once the database is migrated, then the frontend and the Caddy reverse proxy in front of it; `--wait` returns when every service is healthy. Open **http://localhost:3000** for the store (sign in as the superadmin from `.env` for the admin area) and http://localhost:8080/swagger/index.html for the API. The demo catalog from `example_data.csv` is imported on the first start (the file is mounted read-only). Stop with `docker compose down` (add `-v` to wipe the data). The API listens on the same port as `make run`, so run only one of them.
+This builds the backend and frontend images, starts PostgreSQL and Redis, applies migrations, starts the API once the database is migrated, then the frontend and the Caddy reverse proxy in front of it; `--wait` returns when every service is healthy. Open **http://localhost:3000** for the store (sign in as the superadmin from `.env` for the admin area) and http://localhost:8080/swagger/index.html for the API. Compose runs in `production` mode by default, so the catalog starts empty and is filled by an admin (form or CSV import); `APP_ENV=development docker compose up -d --build --wait` imports the demo catalog from `example_data.csv` on the first start (the file is mounted read-only). Stop with `docker compose down` (add `-v` to wipe the data). The API listens on the same port as `make run`, so run only one of them.
 
 ```
 browser ──:3000──▶ proxy (Caddy) ──▶ frontend (Next.js BFF, 172.31.250.10) ──▶ backend (Go API) ──▶ PostgreSQL, Redis
@@ -62,7 +63,7 @@ The image (`backend/Dockerfile`):
 - Healthcheck: BusyBox `wget` calls `/readyz` (PostgreSQL and Redis reachable); a 503 makes it fail. It is used both by the image `HEALTHCHECK` and by compose.
 - Alternative considered: `distroless/static` (no shell, about 5 MB smaller). It has no `wget` or `curl`, so the healthcheck would need extra Go code (a `healthcheck` subcommand or a separate binary) only for Docker; Alpine keeps the application code free of it.
 - Graceful shutdown: compose waits 20 s (`stop_grace_period`), longer than the server's 15 s shutdown timeout, so in-flight requests, including a checkout waiting for payment, finish.
-- In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode). Production never imports the demo catalog, so the catalog starts empty and is filled by an admin; run `APP_ENV=development docker compose up` to get the demo data.
+- In compose `APP_ENV` defaults to `production` (JSON logs, Gin release mode, no demo catalog, see above).
 
 The frontend image (`frontend/Dockerfile`):
 - Multi-stage on `node:24.22.1-alpine`: `npm ci` with a BuildKit cache, `next build` with `output: "standalone"`, and a runtime stage with only the standalone server, its traced dependencies (`next`, `react`, `react-dom`) and static assets, about 225 MB, most of it the Node.js base image.
@@ -143,7 +144,8 @@ backend/
   migrations/              forward-only SQL migrations
   internal/
     app/                   wiring, HTTP server, graceful shutdown, demo seed
-    domain/                entities, value rules, roles and permissions, domain errors
+    domain/                entities, value rules, roles and permissions, domain errors,
+                           types shared by layers (pagination, search and order queries, import report, session)
     usecase/               services + interfaces they depend on (repositories, hasher, tokens, parser)
     repository/postgres/   GORM models, mappers, repositories, transactor
     repository/redis/      refresh tokens, rate limiter
@@ -249,8 +251,8 @@ Admin management only touches accounts with role `ADMIN`; targeting a `USER` or 
 
 ### Authentication
 
-- Access token: JWT HS256, 15 minutes. Refresh token: 32 random bytes, 7 days, stored in Redis **as a SHA-256 hash only**, rotated on every use with atomic `GETDEL`, so a reused refresh token is rejected.
-- Password change, password reset and deactivation revoke all refresh tokens of the user (atomic Lua script).
+- Access token: JWT HS256, 15 minutes. Refresh token: 32 random bytes, 7 days, stored in Redis **as a SHA-256 hash only**, rotated on every use. The old token is only read at the start and burned with atomic `GETDEL` after the new session is stored, so a database or Redis error never logs the user out, and a reused token is still rejected: of two concurrent refreshes with the same token one wins, the other gets `invalid_token` and its new token is revoked.
+- Password change, password reset and deactivation revoke all refresh tokens of the user (atomic Lua script). Password change requires an active account, so a deactivated user cannot use a still valid access token to get a new session.
 - Passwords: bcrypt cost 12, 10 characters to 72 bytes. The upper limit exists because bcrypt silently ignores everything after 72 bytes. A password equal to the email is rejected.
 - Login does not reveal whether an account exists: unknown email, wrong password and deactivated account return the same `invalid_credentials`, and an unknown email still runs a bcrypt comparison so response time is the same.
 - JWT parsing pins the algorithm (no `alg: none`), checks issuer and requires expiration.
@@ -521,7 +523,22 @@ The focus is business rules and the unusual cases, not line coverage:
 - **Security**: forged, expired, `alg: none` and tampered JWTs; temporary password alphabet and uniqueness.
 - **Rate limiter**: the Lua script on miniredis, including 50 concurrent requests against a limit of 10 (exactly 10 pass).
 - **Checkout**: cart limits, duplicates and card rules; price and stock conflicts stop before any payment; every payment outcome (approved, declined, insufficient funds, timeout, provider error) and stock release on failure; payment survives a disconnected client; idempotent replay, reused key, request in progress, Redis outage falling back to the unique index; customers never see other customers' orders.
-- **Integration** (real PostgreSQL 18): repositories, soft delete and SKU reuse, database constraints, 10 concurrent updates with the same version, 30 races between category delete and product create, search ranking, typos, operators and pagination stability; checkout end to end with the fake provider, and **20 buyers racing for the last item: exactly one order is paid, stock ends at 0**.
+- **Integration** (real PostgreSQL 18): repositories, soft delete and SKU reuse, database constraints, 10 concurrent updates with the same version, 30 races between category delete and product create, search ranking, typos, operators and pagination stability; checkout end to end with the fake provider, and **20 buyers racing for the last item: exactly one order is paid, stock ends at 0**; an admin stock edit while an order is `PENDING` keeps the reservation (a failed payment does not inflate stock, a paid one still takes its units, stock below `reserved` is rejected).
+
+### End-to-end tests
+
+`e2e/` holds Playwright scenarios that drive the whole compose stack (Caddy → Next.js BFF → Go API → PostgreSQL, Redis) in Chromium. Test data is created through the API, everything else is done in the UI like a user would:
+- **catalog**: search opens a product page, empty result, guests are redirected to sign in on protected pages;
+- **auth**: wrong password, sign-in, sign-out, registration form validation;
+- **checkout**: guest cart → sign-up at checkout → payment → order page and history; declined and insufficient-funds cards keep the stock and are saved as failed orders; a price change after adding to the cart is shown before paying; the last item sells only once;
+- **admin**: staff cannot buy, a product created in the admin form appears in the catalog, form validation, CSV import preview saves nothing and the real import does.
+
+```bash
+docker compose up -d --build --wait
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+Superadmin credentials come from `.env`; `E2E_BASE_URL` and `E2E_API_URL` point the suite elsewhere (see `e2e/README.md`). The suite runs on one worker because auth endpoints allow 10 requests per minute per IP and all requests come from one machine; wait a minute before running it again.
 
 ## CI
 
@@ -548,12 +565,13 @@ CI uses the same `make` targets as a developer, so tool versions (golangci-lint,
 | **build** | `npm ci`, `npm run lint`, `npm run typecheck`, `npm run build` |
 | **Unit tests** | `npm ci`, `npm test` |
 
-Neither workflow builds Docker images; that would come with a registry and deployment.
+Neither workflow builds Docker images; that would come with a registry and deployment. The end-to-end suite is not in CI yet: it needs the full compose stack on the runner.
 
 ## Known limitations and next steps
 
 - OpenTelemetry tracing: spans for HTTP, SQL, Redis and checkout steps (reserve, payment, finalize), `trace_id` in logs, Jaeger behind `docker compose --profile tracing`.
-- A crash between reservation and payment leaves a `PENDING` order holding stock. A background job should expire old `PENDING` orders (there is a partial index for it) after checking the provider with the order id. With a real provider a timeout is ambiguous (the charge may have gone through), so the order would stay `PENDING` until reconciliation instead of failing immediately; the fake provider guarantees that a timeout charged nothing.
+- Logs and metrics: container logs shipped to Loki, Prometheus scraping a `/metrics` endpoint (request rate, latency, errors, checkout outcomes), Grafana with dashboards over both, behind `docker compose --profile observability`.
+- A crash between reservation and payment leaves a `PENDING` order holding its units in `reserved` (visible in the admin product list). A background job should expire old `PENDING` orders (there is a partial index for it) after checking the provider with the order id. With a real provider a timeout is ambiguous (the charge may have gone through), so the order would stay `PENDING` until reconciliation instead of failing immediately; the fake provider guarantees that a timeout charged nothing.
 - One currency; no taxes, discounts or shipping in the total.
 - Cart lives in the browser (`localStorage`); prices and stock are re-checked at checkout. If carts must follow the user across devices, move them to the database.
 - Order cancellation and refunds (return stock as a compensating action).
@@ -563,6 +581,7 @@ Neither workflow builds Docker images; that would come with a registry and deplo
 - Audit log of admin actions (who changed a role, who deleted a product).
 - Per-account login rate limit; instant access-token revocation.
 - Search cache in Redis (see Search).
+- Run the end-to-end suite in CI: start the compose stack on the runner, with a higher auth rate limit for the test run.
 - The refresh coordinator in the BFF is in-memory, so it deduplicates refreshes only within one frontend instance; with several replicas use sticky sessions or a shared lock in Redis.
 - i18n: the UI and API messages are English only; error `code`s are stable and can be translated on the client.
 - Marketplace mode (see "Single store").
