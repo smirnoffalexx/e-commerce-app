@@ -30,7 +30,7 @@ type productModel struct {
 	Category    *categoryModel  `gorm:"foreignKey:CategoryID"`
 	Price       decimal.Decimal `gorm:"type:numeric(12,2)"`
 	Stock       int
-	Reserved    int             `gorm:"->"`
+	Reserved    int             `gorm:"<-:update"`
 	WeightKg    decimal.Decimal `gorm:"column:weight_kg;type:numeric(10,3)"`
 	Version     int
 	CreatedAt   time.Time

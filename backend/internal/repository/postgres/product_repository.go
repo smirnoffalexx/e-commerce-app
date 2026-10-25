@@ -62,7 +62,7 @@ func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error
 		}
 
 		res := tx.Model(&productModel{}).
-			Where("id = ? AND version = ? AND reserved <= ?", p.ID, p.Version, p.Stock).
+			Where("id = ? AND version = ? AND reserved <= GREATEST(?, 0)", p.ID, p.Version, p.Stock).
 			Updates(map[string]any{
 				"sku":         p.SKU,
 				"name":        p.Name,
