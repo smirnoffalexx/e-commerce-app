@@ -152,8 +152,8 @@ func (r *OrderRepository) ReserveStock(ctx context.Context, items []domain.Order
 	db := conn(ctx, r.db)
 	for _, it := range items {
 		res := db.Model(&productModel{}).
-			Where("id = ? AND stock >= ?", it.ProductID, it.Quantity).
-			Updates(stockChange("stock - ?", it.Quantity))
+			Where("id = ? AND stock - reserved >= ?", it.ProductID, it.Quantity).
+			Updates(map[string]any{"reserved": gorm.Expr("reserved + ?", it.Quantity)})
 		if res.Error != nil {
 			return fmt.Errorf("reserve stock: %w", res.Error)
 		}
@@ -169,22 +169,29 @@ func (r *OrderRepository) ReserveStock(ctx context.Context, items []domain.Order
 }
 
 func (r *OrderRepository) ReleaseStock(ctx context.Context, items []domain.OrderItem) error {
+	return r.settleReserve(ctx, items, false)
+}
+
+func (r *OrderRepository) CommitStock(ctx context.Context, items []domain.OrderItem) error {
+	return r.settleReserve(ctx, items, true)
+}
+
+// settleReserve drops the reservation of each item. On commit the units also leave
+// stock and the version is bumped, so an admin edit based on the old stock is stale.
+func (r *OrderRepository) settleReserve(ctx context.Context, items []domain.OrderItem, commit bool) error {
 	db := conn(ctx, r.db).Unscoped()
 	for _, it := range items {
-		res := db.Model(&productModel{}).Where("id = ?", it.ProductID).Updates(stockChange("stock + ?", it.Quantity))
-		if res.Error != nil {
-			return fmt.Errorf("release stock: %w", res.Error)
+		changes := map[string]any{"reserved": gorm.Expr("reserved - ?", it.Quantity)}
+		if commit {
+			changes["stock"] = gorm.Expr("stock - ?", it.Quantity)
+			changes["version"] = gorm.Expr("version + 1")
+			changes["updated_at"] = gorm.Expr("now()")
+		}
+		if err := db.Model(&productModel{}).Where("id = ?", it.ProductID).Updates(changes).Error; err != nil {
+			return fmt.Errorf("settle reserved stock: %w", err)
 		}
 	}
 	return nil
-}
-
-func stockChange(expr string, quantity int) map[string]any {
-	return map[string]any{
-		"stock":      gorm.Expr(expr, quantity),
-		"version":    gorm.Expr("version + 1"),
-		"updated_at": gorm.Expr("now()"),
-	}
 }
 
 func (r *OrderRepository) Create(ctx context.Context, o *domain.Order) error {

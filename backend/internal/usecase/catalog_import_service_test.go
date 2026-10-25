@@ -172,6 +172,20 @@ func TestCatalogImport_Modes(t *testing.T) {
 		assert.Equal(t, map[int][]string{3: {"sku:sku_taken"}}, codes(report.Errors))
 	})
 
+	t.Run("upsert does not drop stock below reserved units", func(t *testing.T) {
+		d := newImport(t)
+		d.expectTx()
+		reserved := existingProduct2(t, "OLD-1")
+		reserved.Stock, reserved.Reserved = 10, 6
+		d.expectCatalog([]string{"Misc"}, reserved)
+
+		report, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: domain.ImportModeUpsert})
+		require.NoError(t, err)
+		assert.Equal(t, 1, report.Created)
+		assert.Zero(t, report.Updated)
+		assert.Equal(t, map[int][]string{3: {"stock:stock_below_reserved"}}, codes(report.Errors))
+	})
+
 	t.Run("unknown mode is rejected before parsing", func(t *testing.T) {
 		d := newImport(t)
 		_, err := d.svc.Import(ctx, strings.NewReader(file), domain.ImportOptions{Mode: "merge"})

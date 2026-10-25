@@ -46,7 +46,7 @@ export function AddToCartButton({ product, quantity = 1, canBuy, onAdded, childr
         onAdded?.();
         break;
       case "limited":
-        toast.warning(`Only ${Math.min(product.stock, MAX_LINE_QUANTITY)} of ${product.name} can be ordered`, { action });
+        toast.warning(`Only ${Math.min(product.available, MAX_LINE_QUANTITY)} of ${product.name} can be ordered`, { action });
         onAdded?.();
         break;
       case "cart_full":
@@ -59,9 +59,9 @@ export function AddToCartButton({ product, quantity = 1, canBuy, onAdded, childr
   }
 
   return (
-    <Button {...props} disabled={props.disabled || product.stock <= 0} onClick={handleClick}>
+    <Button {...props} disabled={props.disabled || product.available <= 0} onClick={handleClick}>
       <ShoppingCartIcon />
-      {children ?? (product.stock > 0 ? "Add to cart" : "Out of stock")}
+      {children ?? (product.available > 0 ? "Add to cart" : "Out of stock")}
     </Button>
   );
 }

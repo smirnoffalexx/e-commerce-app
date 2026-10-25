@@ -93,6 +93,16 @@ func (d *orderDeps) expectFinalize() {
 	d.orders.EXPECT().UpdateStatus(mock.Anything, mock.Anything).Return(nil)
 }
 
+func (d *orderDeps) expectCommit() *[]domain.OrderItem {
+	var committed []domain.OrderItem
+	d.orders.EXPECT().CommitStock(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, items []domain.OrderItem) error {
+			committed = items
+			return nil
+		})
+	return &committed
+}
+
 func TestOrderService_Checkout_Paid(t *testing.T) {
 	d := newOrders(t)
 	d.expectNoPreviousOrder()
@@ -102,6 +112,7 @@ func TestOrderService_Checkout_Paid(t *testing.T) {
 		return r.Amount.Equal(decimal.RequireFromString("179.98")) && r.IdempotencyKey == d.created.ID.String()
 	})).Return(domain.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil)
 	d.expectFinalize()
+	committed := d.expectCommit()
 
 	res, err := d.svc.Checkout(context.Background(), d.customer.ID, d.input(2, "89.99"))
 	require.NoError(t, err)
@@ -113,6 +124,9 @@ func TestOrderService_Checkout_Paid(t *testing.T) {
 	assert.Equal(t, d.customer.Email, res.Order.CustomerEmail)
 	require.Len(t, res.Order.Items, 1)
 	assert.Equal(t, "RS-001", res.Order.Items[0].SKU)
+	require.Len(t, *committed, 1)
+	assert.Equal(t, d.product.ID, (*committed)[0].ProductID)
+	assert.Equal(t, 2, (*committed)[0].Quantity)
 }
 
 func TestOrderService_Checkout_PaymentChargedWithDeadlineEvenIfClientLeft(t *testing.T) {
@@ -129,6 +143,7 @@ func TestOrderService_Checkout_PaymentChargedWithDeadlineEvenIfClientLeft(t *tes
 			return domain.PaymentResult{Approved: true, PaymentID: "pay_1"}, nil
 		})
 	d.expectFinalize()
+	d.expectCommit()
 
 	res, err := d.svc.Checkout(ctx, d.customer.ID, d.input(1, "89.99"))
 	require.NoError(t, err)

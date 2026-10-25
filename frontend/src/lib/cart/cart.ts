@@ -27,13 +27,13 @@ export function lineFromProduct(product: Product, quantity: number): CartLine {
     name: product.name,
     categorySlug: product.category?.slug,
     price: product.price,
-    stock: product.stock,
+    stock: product.available,
     quantity,
   };
 }
 
 export function addToCart(lines: CartLine[], product: Product, quantity: number): { lines: CartLine[]; outcome: AddOutcome } {
-  const limit = maxQuantity(product.stock);
+  const limit = maxQuantity(product.available);
   if (limit === 0) {
     return { lines, outcome: "out_of_stock" };
   }
@@ -97,7 +97,7 @@ export function reconcile(lines: CartLine[], fresh: Map<string, Product | null>)
     if (toCents(product.price) !== toCents(line.price)) {
       changes.push({ kind: "price_changed", productId: line.productId, name: product.name, from: line.price, to: product.price });
     }
-    const limit = maxQuantity(product.stock);
+    const limit = maxQuantity(product.available);
     if (limit === 0) {
       changes.push({ kind: "out_of_stock", productId: line.productId, name: product.name });
       continue;

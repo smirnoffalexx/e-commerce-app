@@ -60,6 +60,8 @@ type ProductResponse struct {
 	CategoryID  uuid.UUID         `json:"category_id" swaggertype:"string" format:"uuid" example:"0192f6b8-3c5e-7a51-9d3f-2b1c4e5f6a7b"`
 	Price       decimal.Decimal   `json:"price" swaggertype:"string" example:"89.99"`
 	Stock       int               `json:"stock" example:"150"`
+	Reserved    int               `json:"reserved" example:"3"`
+	Available   int               `json:"available" example:"147"`
 	InStock     bool              `json:"in_stock" example:"true"`
 	WeightKg    decimal.Decimal   `json:"weight_kg" swaggertype:"string" example:"0.35"`
 	Version     int               `json:"version" example:"1"`
@@ -84,6 +86,8 @@ func NewProductResponse(p *domain.Product) ProductResponse {
 		CategoryID:  p.CategoryID,
 		Price:       p.Price.Round(domain.PriceDecimals),
 		Stock:       p.Stock,
+		Reserved:    p.Reserved,
+		Available:   p.Available(),
 		InStock:     p.InStock(),
 		WeightKg:    p.WeightKg,
 		Version:     p.Version,

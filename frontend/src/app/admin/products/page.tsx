@@ -77,11 +77,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
                   <TableCell
                     className={cn(
                       "text-right tabular-nums",
-                      product.stock === 0 && "text-destructive",
-                      product.stock > 0 && product.stock <= LOW_STOCK && "text-amber-600",
+                      product.available === 0 && "text-destructive",
+                      product.available > 0 && product.available <= LOW_STOCK && "text-amber-600",
                     )}
                   >
                     {product.stock}
+                    {product.reserved > 0 && <span className="block text-xs text-muted-foreground">{product.reserved} reserved</span>}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">{formatDate(product.updated_at)}</TableCell>
                   <TableCell className="pr-4">

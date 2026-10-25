@@ -93,7 +93,14 @@ export function ProductForm({ categories, product }: { categories: Category[]; p
             </Field>
             <div className="grid gap-6 sm:grid-cols-3">
               <FormField name="price" label="Price, $" inputMode="decimal" defaultValue={product?.price} error={errors.price} />
-              <FormField name="stock" label="Stock" inputMode="numeric" defaultValue={product?.stock.toString()} error={errors.stock} />
+              <FormField
+                name="stock"
+                label="Stock"
+                inputMode="numeric"
+                defaultValue={product?.stock.toString()}
+                error={errors.stock}
+                description={product?.reserved ? `${product.reserved} reserved by pending orders` : undefined}
+              />
               <FormField name="weight_kg" label="Weight, kg" inputMode="decimal" defaultValue={product?.weight_kg} error={errors.weight_kg} />
             </div>
           </FieldGroup>

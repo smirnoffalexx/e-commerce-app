@@ -47,6 +47,8 @@ export interface Product {
   category_id: string;
   price: Money;
   stock: number;
+  reserved: number;
+  available: number;
   in_stock: boolean;
   weight_kg: string;
   version: number;

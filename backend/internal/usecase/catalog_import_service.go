@@ -253,6 +253,9 @@ func validateRow(row domain.ImportRow) (pendingRow, []domain.ImportRowError) {
 }
 
 func rowErrorsFrom(row domain.ImportRow, err error) []domain.ImportRowError {
+	if errors.Is(err, domain.ErrStockBelowReserved) {
+		return []domain.ImportRowError{{Line: row.Line, SKU: row.SKU, Field: "stock", Code: domain.ErrStockBelowReserved.Code(), Message: err.Error()}}
+	}
 	var verr *domain.ValidationError
 	if !errors.As(err, &verr) {
 		return []domain.ImportRowError{{Line: row.Line, SKU: row.SKU, Code: "invalid_row", Message: err.Error()}}

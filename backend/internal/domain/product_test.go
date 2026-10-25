@@ -151,10 +151,29 @@ func TestProduct_Update(t *testing.T) {
 	assert.Equal(t, beforeInvalid, p, "invalid update must not partially modify the product")
 }
 
+func TestProduct_UpdateKeepsReservedUnits(t *testing.T) {
+	p, err := NewProduct(validInput())
+	require.NoError(t, err)
+	p.Reserved = 30
+	assert.Equal(t, 120, p.Available())
+
+	before := p
+	in := validInput()
+	in.Stock = 29
+	require.ErrorIs(t, p.Update(in), ErrStockBelowReserved)
+	assert.Equal(t, before, p)
+
+	in.Stock = 30
+	require.NoError(t, p.Update(in))
+	assert.Zero(t, p.Available())
+	assert.False(t, p.InStock())
+}
+
 func TestProductErrors_Kinds(t *testing.T) {
 	assert.ErrorIs(t, ErrProductNotFound, ErrNotFound)
 	assert.ErrorIs(t, ErrSKUTaken, ErrConflict)
 	assert.ErrorIs(t, ErrProductVersionStale, ErrConflict)
+	assert.ErrorIs(t, ErrStockBelowReserved, ErrConflict)
 	assert.False(t, errors.Is(ErrSKUTaken, ErrNotFound))
 
 	var derr *Error

@@ -158,7 +158,7 @@ func applyProductFilter(q *gorm.DB, f *domain.ProductFilter, search *textSearch)
 		q = q.Where("products.price <= ?", *f.MaxPrice)
 	}
 	if f.InStock {
-		q = q.Where("products.stock > 0")
+		q = q.Where("products.stock > products.reserved")
 	}
 	return q
 }

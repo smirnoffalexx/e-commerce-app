@@ -214,7 +214,7 @@ Every error is `application/problem+json` (RFC 9457) with a stable machine-reada
 | Not allowed, or temporary password must be changed first | 403 |
 | Not found (also unknown route) | 404 |
 | Wrong method | 405 |
-| SKU taken, category exists or in use, version conflict, cart prices or stock changed, checkout with this key still running | 409 |
+| SKU taken, category exists or in use, version conflict, stock below reserved, cart prices or stock changed, checkout with this key still running | 409 |
 | Body too large (JSON 1 MB, CSV 5 MB) | 413 |
 | Wrong `Content-Type` | 415 |
 | Business validation failed (all fields reported at once), `Idempotency-Key` reused with a different body | 422 |
@@ -282,11 +282,11 @@ Admin management only touches accounts with role `ADMIN`; targeting a `USER` or 
 
 Flow:
 1. **Validate** everything at once: 1 to 50 lines, quantity 1 to 100, each product once, prices with at most 2 decimals, card number (12 to 19 digits, Luhn), expiry not in the past, CVC 3 or 4 digits.
-2. **Reserve** in one transaction: lock the product rows `FOR UPDATE` **in id order** (two carts with the same products in a different order cannot deadlock), compare stock and prices, decrement with `UPDATE ... SET stock = stock - n WHERE stock >= n` (a second guard on top of the lock), insert the order as `PENDING` with item snapshots. Decrementing stock also bumps the product `version`, so an admin edit based on the old stock fails with `409 version_conflict` instead of overwriting a purchase.
+2. **Reserve** in one transaction: lock the product rows `FOR UPDATE` **in id order** (two carts with the same products in a different order cannot deadlock), compare available units and prices, reserve with `UPDATE ... SET reserved = reserved + n WHERE stock - reserved >= n` (a second guard on top of the lock), insert the order as `PENDING` with item snapshots. `stock` stays the units on hand and is never decremented here, so an admin edit or a CSV import that writes `stock` while the payment runs cannot wipe or inflate the reservation; writing `stock` below `reserved` fails with `409 stock_below_reserved`.
 3. **Charge** the payment provider **outside** the transaction, so row locks are never held during a network call; 10 second timeout. The order id is the provider idempotency key. If the client disconnects after the reservation the payment still runs to the end (`context.WithoutCancel`).
-4. **Finalize** in a second transaction: `PAID` with the payment id, or `FAILED` with a reason and the stock returned. The status update is guarded with `WHERE status = 'PENDING'`.
+4. **Finalize** in a second transaction: `PAID` with the payment id and `stock - n, reserved - n` (this bumps the product `version`, so an admin edit based on the stock before the sale fails with `409 version_conflict`), or `FAILED` with a reason and only `reserved - n`. The status update is guarded with `WHERE status = 'PENDING'`.
 
-Prices: the client sends the price it showed; if any differs, nothing is reserved or charged and the response is `409 price_changed` with the current price per item. Missing, deleted, sold out (`stock = 0`) or short items give `409 items_unavailable`. All problems are reported in one response in `items`:
+Prices: the client sends the price it showed; if any differs, nothing is reserved or charged and the response is `409 price_changed` with the current price per item. Missing, deleted, sold out (no available units) or short items give `409 items_unavailable`. All problems are reported in one response in `items`:
 
 ```json
 { "status": 409, "code": "price_changed",

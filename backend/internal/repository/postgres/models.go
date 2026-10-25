@@ -30,6 +30,7 @@ type productModel struct {
 	Category    *categoryModel  `gorm:"foreignKey:CategoryID"`
 	Price       decimal.Decimal `gorm:"type:numeric(12,2)"`
 	Stock       int
+	Reserved    int             `gorm:"->"`
 	WeightKg    decimal.Decimal `gorm:"column:weight_kg;type:numeric(10,3)"`
 	Version     int
 	CreatedAt   time.Time
@@ -84,6 +85,7 @@ func productToDomain(m *productModel) domain.Product {
 		CategoryID:  m.CategoryID,
 		Price:       m.Price,
 		Stock:       m.Stock,
+		Reserved:    m.Reserved,
 		WeightKg:    m.WeightKg,
 		Version:     m.Version,
 		CreatedAt:   m.CreatedAt.UTC(),

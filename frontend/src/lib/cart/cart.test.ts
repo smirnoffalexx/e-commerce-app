@@ -21,6 +21,8 @@ function product(overrides: Partial<Product> = {}): Product {
     category: { id: "c1", name: "Kitchen", slug: "kitchen" },
     price: "12.50",
     stock: 10,
+    reserved: 0,
+    available: 10,
     in_stock: true,
     weight_kg: "0.3",
     version: 1,
@@ -41,12 +43,12 @@ describe("addToCart", () => {
   });
 
   it("caps the quantity at the stock and at 100 per line", () => {
-    expect(addToCart([], product({ stock: 3 }), 5)).toMatchObject({ outcome: "limited", lines: [{ quantity: 3 }] });
-    expect(addToCart([], product({ stock: 500 }), 150)).toMatchObject({ outcome: "limited", lines: [{ quantity: 100 }] });
+    expect(addToCart([], product({ available: 3 }), 5)).toMatchObject({ outcome: "limited", lines: [{ quantity: 3 }] });
+    expect(addToCart([], product({ available: 500 }), 150)).toMatchObject({ outcome: "limited", lines: [{ quantity: 100 }] });
   });
 
   it("refuses out-of-stock products and a 51st line", () => {
-    expect(addToCart([], product({ stock: 0 }), 1).outcome).toBe("out_of_stock");
+    expect(addToCart([], product({ available: 0 }), 1).outcome).toBe("out_of_stock");
     const full = Array.from({ length: MAX_CART_LINES }, (_, i) => lineFromProduct(product({ id: `p${i}` }), 1));
     expect(addToCart(full, product({ id: "new" }), 1).outcome).toBe("cart_full");
     expect(addToCart(full, product({ id: "p0" }), 1).outcome).toBe("added");
@@ -55,7 +57,7 @@ describe("addToCart", () => {
 
 describe("setQuantity", () => {
   it("keeps the quantity between 1 and the known stock", () => {
-    const lines = [lineFromProduct(product({ stock: 4 }), 2)];
+    const lines = [lineFromProduct(product({ available: 4 }), 2)];
     expect(setQuantity(lines, "p1", 0)[0].quantity).toBe(1);
     expect(setQuantity(lines, "p1", 9)[0].quantity).toBe(4);
   });
@@ -73,7 +75,7 @@ describe("reconcile", () => {
   const cart = [
     lineFromProduct(product({ id: "same" }), 1),
     lineFromProduct(product({ id: "pricier", price: "10.00" }), 1),
-    lineFromProduct(product({ id: "scarce", stock: 10 }), 6),
+    lineFromProduct(product({ id: "scarce", available: 10 }), 6),
     lineFromProduct(product({ id: "sold-out" }), 1),
     lineFromProduct(product({ id: "deleted" }), 1),
     lineFromProduct(product({ id: "not-checked" }), 1),
@@ -82,8 +84,8 @@ describe("reconcile", () => {
   const fresh = new Map<string, Product | null>([
     ["same", product({ id: "same" })],
     ["pricier", product({ id: "pricier", price: "12.00" })],
-    ["scarce", product({ id: "scarce", stock: 2 })],
-    ["sold-out", product({ id: "sold-out", stock: 0 })],
+    ["scarce", product({ id: "scarce", available: 2 })],
+    ["sold-out", product({ id: "sold-out", available: 0 })],
     ["deleted", null],
   ]);
 

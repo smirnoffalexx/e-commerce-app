@@ -62,6 +62,7 @@ type OrderRepository interface {
 	LockProducts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Product, error)
 	ReserveStock(ctx context.Context, items []domain.OrderItem) error
 	ReleaseStock(ctx context.Context, items []domain.OrderItem) error
+	CommitStock(ctx context.Context, items []domain.OrderItem) error
 	Create(ctx context.Context, o *domain.Order) error
 	GetByID(ctx context.Context, id uuid.UUID) (domain.Order, error)
 	GetByIdempotencyKey(ctx context.Context, userID uuid.UUID, key string) (domain.Order, error)

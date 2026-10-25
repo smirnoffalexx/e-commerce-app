@@ -11,14 +11,14 @@ export function ProductPurchase({ product, canBuy }: { product: Product; canBuy:
   const { lines } = useCart();
   const hydrated = useCartHydrated();
   const inCart = lines.find((line) => line.productId === product.id)?.quantity ?? 0;
-  const available = Math.max(0, maxQuantity(product.stock) - inCart);
+  const available = Math.max(0, maxQuantity(product.available) - inCart);
   const [quantity, setQuantity] = useState(1);
   const value = Math.min(quantity, Math.max(1, available));
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        {canBuy && product.stock > 0 && (
+        {canBuy && product.available > 0 && (
           <QuantityStepper value={value} max={Math.max(1, available)} onChange={setQuantity} />
         )}
         <AddToCartButton

@@ -189,10 +189,12 @@ func (s *OrderService) finalize(ctx context.Context, id uuid.UUID, paymentID, fa
 		if err != nil {
 			return err
 		}
+		settle := s.orders.CommitStock
 		if failure != "" {
-			if err := s.orders.ReleaseStock(ctx, o.Items); err != nil {
-				return err
-			}
+			settle = s.orders.ReleaseStock
+		}
+		if err := settle(ctx, o.Items); err != nil {
+			return err
 		}
 		if err := s.orders.UpdateStatus(ctx, &o); err != nil {
 			return err

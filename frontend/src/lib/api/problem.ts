@@ -23,6 +23,7 @@ const messages: Record<string, string> = {
   admin_not_found: "Administrator not found.",
   sku_taken: "A product with this SKU already exists.",
   version_conflict: "Someone else changed this product. Reload it and try again.",
+  stock_below_reserved: "Stock cannot be lower than the units reserved by pending orders.",
   category_exists: "A category with this name already exists.",
   category_in_use: "This category still has products and cannot be deleted.",
   price_changed: "Some prices have changed since you added the items.",

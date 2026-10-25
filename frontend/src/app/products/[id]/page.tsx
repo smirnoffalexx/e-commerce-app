@@ -79,7 +79,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               {product.category && <span className="text-sm font-medium text-primary">{product.category.name}</span>}
-              <StockBadge stock={product.stock} />
+              <StockBadge stock={product.available} />
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{product.name}</h1>
             <p className="text-3xl font-semibold tabular-nums">{formatMoney(product.price)}</p>
@@ -90,7 +90,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
             <Spec icon={<TagIcon />} label="SKU" value={<span className="font-mono">{product.sku}</span>} />
             <Spec icon={<ScaleIcon />} label="Weight" value={`${Number(product.weight_kg)} kg`} />
-            <Spec icon={<PackageIcon />} label="Available" value={product.stock > 0 ? `${product.stock} pcs` : "None"} />
+            <Spec icon={<PackageIcon />} label="Available" value={product.available > 0 ? `${product.available} pcs` : "None"} />
           </dl>
         </div>
       </div>

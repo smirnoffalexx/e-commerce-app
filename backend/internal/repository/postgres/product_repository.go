@@ -62,7 +62,7 @@ func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error
 		}
 
 		res := tx.Model(&productModel{}).
-			Where("id = ? AND version = ?", p.ID, p.Version).
+			Where("id = ? AND version = ? AND reserved <= ?", p.ID, p.Version, p.Stock).
 			Updates(map[string]any{
 				"sku":         p.SKU,
 				"name":        p.Name,
@@ -81,7 +81,7 @@ func (r *ProductRepository) Update(ctx context.Context, p *domain.Product) error
 			return fmt.Errorf("update product: %w", res.Error)
 		}
 		if res.RowsAffected == 0 {
-			return r.missingOrStale(tx, p.ID)
+			return r.rejectedUpdate(tx, p)
 		}
 
 		var m productModel
@@ -109,16 +109,19 @@ func (r *ProductRepository) withCategory(q *gorm.DB) *gorm.DB {
 	return q.Preload("Category", func(db *gorm.DB) *gorm.DB { return db.Unscoped() })
 }
 
-func (r *ProductRepository) missingOrStale(tx *gorm.DB, id uuid.UUID) error {
-	var exists bool
-	err := tx.Raw("SELECT EXISTS (SELECT 1 FROM products WHERE id = ? AND deleted_at IS NULL)", id).Scan(&exists).Error
-	if err != nil {
-		return fmt.Errorf("check product existence: %w", err)
-	}
-	if exists {
+func (r *ProductRepository) rejectedUpdate(tx *gorm.DB, p *domain.Product) error {
+	var current productModel
+	err := tx.Select("version", "reserved").Take(&current, "id = ?", p.ID).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return domain.ErrProductNotFound
+	case err != nil:
+		return fmt.Errorf("check product state: %w", err)
+	case current.Version == p.Version && current.Reserved > p.Stock:
+		return domain.ErrStockBelowReserved
+	default:
 		return domain.ErrProductVersionStale
 	}
-	return domain.ErrProductNotFound
 }
 
 func lockActiveCategory(tx *gorm.DB, id uuid.UUID) (categoryModel, error) {

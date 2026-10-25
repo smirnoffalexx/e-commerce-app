@@ -150,7 +150,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 //	@Success		200		{object}	dto.ProductResponse
 //	@Failure		400		{object}	response.Problem	"Malformed JSON, unknown field or invalid ID"
 //	@Failure		404		{object}	response.Problem	"Product or category not found"
-//	@Failure		409		{object}	response.Problem	"SKU already exists or version conflict"
+//	@Failure		409		{object}	response.Problem	"SKU already exists, version conflict or stock below reserved"
 //	@Failure		413		{object}	response.Problem	"Body too large"
 //	@Failure		415		{object}	response.Problem	"Content-Type is not application/json"
 //	@Failure		422		{object}	response.Problem	"Validation failed"

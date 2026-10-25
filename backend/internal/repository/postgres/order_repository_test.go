@@ -87,7 +87,7 @@ func TestOrderRepository(t *testing.T) {
 		assert.Equal(t, "pay_1", paid[0].PaymentID)
 	})
 
-	t.Run("reserve bumps version and never goes below zero, release restores", func(t *testing.T) {
+	t.Run("reserve holds units without touching stock or version, commit and release settle them", func(t *testing.T) {
 		resetDB(t)
 		p := mustProduct(t, products, "RS-001", mustCategory(t, categories, "Shoes").ID)
 		items := []domain.OrderItem{{ProductID: p.ID, Quantity: 4}}
@@ -95,17 +95,61 @@ func TestOrderRepository(t *testing.T) {
 		require.NoError(t, orders.ReserveStock(ctx, items))
 		after, err := products.GetByID(ctx, p.ID)
 		require.NoError(t, err)
-		assert.Equal(t, 6, after.Stock)
-		assert.Equal(t, p.Version+1, after.Version, "admin edits based on the old version must fail")
+		assert.Equal(t, 10, after.Stock)
+		assert.Equal(t, 4, after.Reserved)
+		assert.Equal(t, p.Version, after.Version, "a reservation must not make admin edits stale")
 
 		var cerr *domain.CheckoutConflictError
 		assert.ErrorAs(t, orders.ReserveStock(ctx, []domain.OrderItem{{ProductID: p.ID, Quantity: 7}}), &cerr)
 
+		require.NoError(t, orders.CommitStock(ctx, items))
+		after, err = products.GetByID(ctx, p.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 6, after.Stock)
+		assert.Zero(t, after.Reserved)
+		assert.Equal(t, p.Version+1, after.Version, "admin edits based on the stock before the sale must fail")
+
+		require.NoError(t, orders.ReserveStock(ctx, items))
 		require.NoError(t, products.Delete(ctx, p.ID))
-		require.NoError(t, orders.ReleaseStock(ctx, items), "stock returns even if the product was deleted meanwhile")
-		var stock int
-		require.NoError(t, testDB.Raw("SELECT stock FROM products WHERE id = ?", p.ID).Scan(&stock).Error)
-		assert.Equal(t, 10, stock)
+		require.NoError(t, orders.ReleaseStock(ctx, items), "reservation is released even if the product was deleted meanwhile")
+		var row struct{ Stock, Reserved int }
+		require.NoError(t, testDB.Raw("SELECT stock, reserved FROM products WHERE id = ?", p.ID).Scan(&row).Error)
+		assert.Equal(t, 6, row.Stock)
+		assert.Zero(t, row.Reserved)
+	})
+
+	t.Run("admin stock write during a pending order keeps the reservation", func(t *testing.T) {
+		resetDB(t)
+		p := mustProduct(t, products, "RS-001", mustCategory(t, categories, "Shoes").ID)
+		items := []domain.OrderItem{{ProductID: p.ID, Quantity: 4}}
+		require.NoError(t, orders.ReserveStock(ctx, items))
+
+		edit, err := products.GetByID(ctx, p.ID)
+		require.NoError(t, err)
+		edit.Stock = 3
+		assert.ErrorIs(t, products.Update(ctx, &edit), domain.ErrStockBelowReserved)
+
+		edit, err = products.GetByID(ctx, p.ID)
+		require.NoError(t, err)
+		edit.Stock = 20
+		require.NoError(t, products.Update(ctx, &edit))
+		assert.Equal(t, 4, edit.Reserved)
+		assert.Equal(t, 16, edit.Available())
+
+		require.NoError(t, orders.ReleaseStock(ctx, items))
+		after, err := products.GetByID(ctx, p.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 20, after.Stock, "a failed payment must not inflate the stock written by the admin")
+		assert.Zero(t, after.Reserved)
+
+		require.NoError(t, orders.ReserveStock(ctx, items))
+		edit = after
+		edit.Stock = 5
+		require.NoError(t, products.Update(ctx, &edit))
+		require.NoError(t, orders.CommitStock(ctx, items))
+		after, err = products.GetByID(ctx, p.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 1, after.Stock, "a paid order still takes its units from the stock written by the admin")
 	})
 }
 
@@ -126,6 +170,7 @@ func TestCheckout_EndToEnd(t *testing.T) {
 		current, err := products.GetByID(ctx, p.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 10, current.Stock)
+		assert.Zero(t, current.Reserved)
 
 		res, err = svc.Checkout(ctx, customer.ID, checkoutFor(p, 3, "k-2", "4242424242424242"))
 		require.NoError(t, err)
@@ -187,5 +232,6 @@ func TestCheckout_EndToEnd(t *testing.T) {
 		current, err := products.GetByID(ctx, p.ID)
 		require.NoError(t, err)
 		assert.Zero(t, current.Stock)
+		assert.Zero(t, current.Reserved)
 	})
 }

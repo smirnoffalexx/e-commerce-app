@@ -28,6 +28,7 @@ var (
 	ErrProductNotFound     = NewError(ErrNotFound, "product_not_found", "product not found")
 	ErrSKUTaken            = NewError(ErrConflict, "sku_taken", "product with this SKU already exists")
 	ErrProductVersionStale = NewError(ErrConflict, "version_conflict", "product was modified by another request, reload and try again")
+	ErrStockBelowReserved  = NewError(ErrConflict, "stock_below_reserved", "stock cannot be lower than the quantity reserved by pending orders")
 )
 
 type Product struct {
@@ -39,6 +40,7 @@ type Product struct {
 	Category    *Category
 	Price       decimal.Decimal
 	Stock       int
+	Reserved    int
 	WeightKg    decimal.Decimal
 	Version     int
 	CreatedAt   time.Time
@@ -67,14 +69,21 @@ func (p *Product) Update(in ProductInput) error {
 	return p.apply(in)
 }
 
+func (p *Product) Available() int {
+	return p.Stock - p.Reserved
+}
+
 func (p *Product) InStock() bool {
-	return p.Stock > 0
+	return p.Available() > 0
 }
 
 func (p *Product) apply(in ProductInput) error {
 	in = in.normalize()
 	if err := in.Validate(); err != nil {
 		return err
+	}
+	if in.Stock < p.Reserved {
+		return ErrStockBelowReserved
 	}
 
 	p.SKU = in.SKU

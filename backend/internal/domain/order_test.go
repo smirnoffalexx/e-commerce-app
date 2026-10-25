@@ -197,6 +197,18 @@ func TestCheckCart(t *testing.T) {
 			missing:     IssueProductUnavailable,
 		}, codes)
 	})
+
+	t.Run("reserved units are not available", func(t *testing.T) {
+		p := product(5, "1.00")
+		p.Reserved = 3
+		in := validCheckout(CheckoutLine{ProductID: p.ID, Quantity: 3, ExpectedPrice: decimal.RequireFromString("1.00")})
+
+		var cerr *CheckoutConflictError
+		require.ErrorAs(t, CheckCart(&in, map[uuid.UUID]Product{p.ID: p}), &cerr)
+		require.Len(t, cerr.Issues, 1)
+		assert.Equal(t, IssueInsufficientStock, cerr.Issues[0].Code)
+		assert.Equal(t, 2, cerr.Issues[0].AvailableQuantity)
+	})
 }
 
 func TestNewOrder_SnapshotsProducts(t *testing.T) {

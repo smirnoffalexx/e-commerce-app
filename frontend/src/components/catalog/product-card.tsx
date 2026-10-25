@@ -16,7 +16,7 @@ export function ProductCard({ product, canBuy }: { product: Product; canBuy: boo
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{product.category?.name}</p>
-          <StockBadge stock={product.stock} />
+          <StockBadge stock={product.available} />
         </div>
         <h2 className="line-clamp-2 font-medium leading-snug">
           <Link href={`/products/${product.id}`} className="after:absolute after:inset-0">

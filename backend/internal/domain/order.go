@@ -236,12 +236,12 @@ func CheckCart(in *CheckoutInput, products map[uuid.UUID]Product) error {
 			continue
 		}
 
-		issue.AvailableQuantity = p.Stock
+		issue.AvailableQuantity = p.Available()
 		issue.CurrentPrice = p.Price
 		switch {
 		case !p.InStock():
 			issue.Code = IssueOutOfStock
-		case p.Stock < line.Quantity:
+		case p.Available() < line.Quantity:
 			issue.Code = IssueInsufficientStock
 		case !p.Price.Equal(line.ExpectedPrice):
 			issue.Code = IssuePriceChanged
