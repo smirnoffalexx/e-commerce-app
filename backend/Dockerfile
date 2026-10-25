@@ -24,6 +24,6 @@ COPY --from=build /out/api /app/api
 USER app:app
 EXPOSE 8080
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=1s --timeout=3s --start-period=20s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1
 ENTRYPOINT ["/app/api"]

@@ -13,7 +13,7 @@ services:
       - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
+      interval: 1s
       timeout: 3s
       retries: 10
       start_period: 10s
@@ -28,7 +28,7 @@ services:
       - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 1s
       timeout: 3s
       retries: 10
     restart: unless-stopped
@@ -81,7 +81,7 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1"]
-      interval: 10s
+      interval: 1s
       timeout: 3s
       retries: 3
       start_period: 20s
@@ -109,7 +109,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/healthz || exit 1"]
-      interval: 10s
+      interval: 1s
       timeout: 3s
       retries: 3
       start_period: 15s
@@ -132,7 +132,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
-      interval: 10s
+      interval: 1s
       timeout: 3s
       retries: 3
       start_period: 5s
